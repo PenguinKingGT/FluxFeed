@@ -1,0 +1,11 @@
+{
+  "extensionName": {
+    "message": "FluxFeed"
+  },
+  "extensionDescription": {
+    "message": "ローカル保存、フォルダー管理、集中読書に対応した RSS・Atom リーダーです。"
+  },
+  "actionTitle": {
+    "message": "FluxFeed を開く"
+  }
+}

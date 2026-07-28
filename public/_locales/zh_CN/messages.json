@@ -1,0 +1,11 @@
+{
+  "extensionName": {
+    "message": "FluxFeed"
+  },
+  "extensionDescription": {
+    "message": "一款支持本地存储、目录管理和沉浸阅读的 RSS 与 Atom 阅读器。"
+  },
+  "actionTitle": {
+    "message": "打开 FluxFeed"
+  }
+}

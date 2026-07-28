@@ -1,0 +1,11 @@
+{
+  "extensionName": {
+    "message": "FluxFeed"
+  },
+  "extensionDescription": {
+    "message": "A focused RSS and Atom reader with local storage, folders, and distraction-free reading."
+  },
+  "actionTitle": {
+    "message": "Open FluxFeed"
+  }
+}
