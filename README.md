@@ -173,4 +173,4 @@ pnpm test:e2e
 
 ## License
 
-This repository does not currently contain a project license file. Source availability alone does not grant permission to redistribute or create derivative works. A license should be selected and added before the first public release.
+FluxFeed is released under the [MIT License](./LICENSE).
