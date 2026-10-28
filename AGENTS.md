@@ -1,33 +1,87 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+## 项目与目录
 
-FluxFeed is a WXT browser extension built with React and TypeScript. Browser entrypoints live in `entrypoints/` (`background`, `content`, `popup`, and `options`). UI components belong in `components/`, hooks in `hooks/`, domain logic and types in `lib/`, and Zustand state in `store/`. Put served files and locale catalogs in `public/`, artwork in `assets/`, unit tests in `tests/unit/`, and browser tests in `tests/e2e/`. Consult `docs/architecture.md` and the relevant `docs/features/` document before changing cross-boundary behavior.
+FluxFeed 是使用 WXT、React 和 TypeScript 构建的本地优先浏览器订阅阅读器，支持 RSS、Atom、JSON Feed，以及可选的 AI 摘要和今日简报。
 
-## Build, Test, and Development Commands
+- `entrypoints/`：后台、内容脚本、Popup 和 Options 入口；入口负责组装依赖和注册生命周期。
+- `components/`：阅读器、设置、简报、Popup 和 `ui/` 基础组件。
+- `hooks/`：可复用 React Hooks。
+- `lib/`：领域逻辑、解析、存储、搜索、AI、国际化和共享类型。
+- `store/`：Zustand 状态及后台消息客户端。
+- `public/`：扩展图标、浏览器语言目录和静态资源；`assets/`：源设计资源。
+- `tests/unit/`：单元和组件测试；`tests/e2e/`：真实浏览器扩展测试。
+- `docs/features/`：功能要求和行为边界；`docs/steps/`：实施计划，完成状态以代码和验证结果为准。
 
-Use `pnpm`; the lockfile is committed.
+修改运行边界、数据流、持久化或跨入口行为前，阅读 `docs/architecture.md`。修改订阅、阅读、搜索、清理或 OPML 时，阅读 `docs/features/basic-function-completion.md`；修改 AI 时，阅读 `docs/features/ai-article-summary.md`；修改整体界面时，阅读 `docs/features/ui-ux-redesign.md`。
 
-- `pnpm install`: install dependencies and prepare WXT-generated files.
-- `pnpm dev` / `pnpm dev:firefox`: run the extension in development mode.
-- `pnpm build` / `pnpm build:firefox`: create Chrome or Firefox production builds.
-- `pnpm compile`: type-check with TypeScript without emitting files.
-- `pnpm lint` (`pnpm lint:fix`): run Oxlint (or apply safe fixes).
-- `pnpm test --run`: run the Vitest suite once.
-- `pnpm test:e2e`: build Chrome and run Playwright extension tests.
+## 代码质量与可维护性
 
-## Coding Style & Naming Conventions
+- 以正确性、可读性和长期维护为交付标准；类型检查和 lint 通过只是基础要求。
+- 每个模块、组件和函数承担清晰职责。业务规则放在领域模块中，组件负责展示和交互，Store 负责状态协调；入口保持简洁。
+- 函数过长、嵌套过深或同时处理多个阶段时，按有意义的业务步骤拆分。优先使用提前返回，保持主流程清晰。
+- 使用表达领域含义的名称，明确输入、输出、状态和副作用。共享边界和导出函数应有明确的类型契约；用联合类型表达互斥状态。
+- 复用现有能力，将重复的业务规则收敛到单一实现；只有存在明确复用需求或复杂性收益时才增加抽象。
+- 保持 TypeScript 类型安全。外部输入先以 `unknown` 接收并校验；使用 `any`、类型断言或检查抑制时，必须说明必要性及安全依据。
+- 修改公共类型、Runtime 消息或数据库结构时，检查所有调用方、旧数据兼容和迁移需求，避免局部修复破坏其他入口。
+- 异步流程应覆盖失败、加载结束和重复触发；涉及并发时明确竞态处理。外部请求应有合理的超时和资源上限。
+- 错误必须转为可处理的结果或有上下文的错误信息；失败时恢复可重试状态，避免吞掉异常或伪造成功。
+- 改动围绕当前任务，保留用户已有修改。发现其他问题时单独说明，避免混入无关重构。
 
-Follow the existing two-space indentation, single quotes, semicolons, ES modules, and React function-component style. Use PascalCase for component files (`ReaderLayout.tsx`), kebab-case for utility modules (`feed-fetcher.ts`), and `*.test.ts` or `*.test.tsx` for tests. Prefer named exports and the `@/` path alias. Reuse semantic Tailwind tokens and existing `components/ui/` primitives instead of introducing one-off styling.
+## 排版与命名
 
-## Testing Guidelines
+- 使用两空格缩进、单引号、分号、ES modules 和 React 函数组件。优先具名导出，使用 `@/` 路径别名；WXT 等框架要求的导出遵循框架约定。
+- 组件文件使用 PascalCase，例如 `ReaderLayout.tsx`；工具和领域模块使用 kebab-case，例如 `feed-fetcher.ts`；现有 Store 文件保持所在目录约定。
+- 代码按逻辑展开，一行只表达一个清晰操作。函数体、分支、循环和异常处理使用多行块，不将多个语句挤在一行。
+- 较长的参数列表、对象、条件和调用链按层级换行。复杂表达式提取为有意义的中间变量或函数，避免嵌套三元表达式。
+- JSX 的多个属性和嵌套内容分行书写；较长事件处理逻辑提取为具名函数。简单文本标签和短表达式可保持单行。
+- 用空行区分校验、计算、持久化和结果处理等逻辑阶段，保持相关代码相邻。
+- UI 复用语义化 Tailwind tokens 和 `components/ui/` 基础组件；新增样式遵循现有主题、响应式和可访问性约定。
 
-Vitest runs in `jsdom` with IndexedDB initialized by `tests/setup-indexeddb.ts`; Playwright covers the built extension with one worker. Add focused unit or component tests beside the existing behavioral suites. Reserve E2E tests for browser permissions, entrypoint integration, and critical workflows. Before submitting, run `pnpm test --run`, `pnpm compile`, and `pnpm lint`; include builds and E2E checks for runtime or manifest changes.
+## 注释要求
 
-## Commit & Pull Request Guidelines
+- 新增或实质修改的函数、Hook 和类需要简洁注释，说明职责；公开 API 及复杂函数使用 JSDoc，按需说明参数约束、返回值、副作用和失败语义。
+- React 组件说明其展示职责和关键交互；简单匿名回调可由所属函数或相邻逻辑注释覆盖。
+- 关键位置和复杂代码必须就近注释，尤其是并发控制、缓存失效、数据迁移、保留策略、安全校验、浏览器兼容处理和非直观算法。
+- 注释优先解释原因、约束、边界和取舍，避免只重复代码表面动作。复杂算法同时交代主要步骤，便于维护者验证实现。
+- 修改行为时同步更新相关注释。TODO 应说明具体缺口和触发条件，已有 Issue 时附引用。
 
-History follows Conventional Commit-style subjects, including `feat:`, `fix:`, and `test:`, with optional scopes such as `feat(reader):`. Keep commits focused and imperative. Pull requests should explain user-visible impact, link the relevant issue or feature document, list verification performed, and include screenshots or clips for UI changes.
+## 运行边界与安全
 
-## Security, Localization & Documentation
+- Feed 网络请求、数据库写入、扩展后台浏览器操作和外部 AI 请求由后台运行时负责；UI 经既有消息客户端调用。Popup、Options 和内容脚本各自必要的浏览器交互遵循现有架构。
+- Chrome MV3 Service Worker 可能随时重载；持久数据存入既有存储，Runtime 消息拒绝应转换为稳定失败结果，页面不得永久停留在加载状态。
+- 普通数据使用 Dexie / IndexedDB；AI API Key 仅存于 `browser.storage.local` 专用存储，不进入普通设置、Zustand、UI 回传、日志或导出文件。
+- Feed 内容、网页内容、导入文件和模型输出均视为不可信输入；校验结构、协议和大小，文章 HTML 通过既有清洗模块后渲染。
+- AI 输出按纯文本展示；模型返回的文章 ID 必须属于本次本地输入集合。保持现有请求触发、批次、并发、超时和降级边界。
+- 新增权限、外部请求或数据传输时，明确用户可见行为，并同步更新隐私和权限说明。
 
-Keep feed/database writes, browser APIs, and external AI calls in the background runtime. Store AI keys only in `browser.storage.local`; never expose them through page state or logs. Treat feed and AI content as untrusted. Keep English, Simplified Chinese, and Japanese locale resources synchronized. Update all three README files when features, installation, permissions, privacy, or browser support change.
+## 本地化与文档
+
+- UI 文案使用国际化键；同步维护 `lib/i18n/resources/` 中英文、简体中文、日文资源，浏览器级文案同步维护 `public/_locales/`。
+- 日期、数字和数量文案使用现有本地化工具，避免在组件内硬编码语言或格式。
+- 功能行为变化时更新对应功能文档；架构边界变化时更新 `docs/architecture.md`。
+- 功能、安装、权限、隐私或浏览器支持变化时，同步更新 `README.md`、`README.zh-CN.md` 和 `README.ja.md`。
+
+## 开发与验证
+
+使用 `pnpm`，保留并维护已提交的锁文件。命令的具体定义以 `package.json` 为准。
+
+- 安装与开发：`pnpm install`、`pnpm dev`、`pnpm dev:firefox`。
+- 基础验证：`pnpm test --run`、`pnpm compile`、`pnpm lint`。
+- 生产构建：`pnpm build`、`pnpm build:firefox`。
+- 浏览器集成：`pnpm test:e2e`，该命令会先构建 Chrome 扩展。
+
+业务代码变更完成后运行基础验证；涉及 Runtime、Manifest 或浏览器集成时，增加两个浏览器的构建和相关 E2E 检查。纯文档变更检查内容准确性、引用路径和 diff 即可。
+
+Vitest 使用 jsdom，IndexedDB 由 `tests/setup-indexeddb.ts` 初始化。测试命名为 `*.test.ts` 或 `*.test.tsx`，遵循现有行为测试风格。
+
+- 修复缺陷时添加能复现问题的回归测试；新增业务行为覆盖正常路径、重要边界和失败恢复。
+- 优先断言用户可观察行为和数据结果，避免只验证内部实现细节。网络和 AI 测试使用本地夹具或 mock，保持结果可重复。
+- E2E 用于权限、入口集成和关键工作流；UI 改动验证相关屏幕宽度、键盘交互和加载、空白、错误状态。
+- 交付时说明实际执行的检查及结果；未执行或被阻塞的检查明确说明原因，不将已有测试等同于本次验证。
+
+## 提交与 Pull Request
+
+使用 Conventional Commit 风格，例如 `feat(reader): add feed filters`、`fix: recover from invalid feed responses`。提交保持范围集中，标题描述具体变化。
+
+PR 说明用户可见影响、相关 Issue 或功能文档、验证结果和必要的兼容性说明；UI 改动附截图或短视频。
