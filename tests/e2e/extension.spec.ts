@@ -464,6 +464,14 @@ test('creates folders and feeds from the plus menu while keeping the footer feed
   await expect(page.getByRole('combobox', { name: 'Folder', exact: true })).toContainText('Reading / Engineering');
   await page.keyboard.press('Escape');
 
+  // Switching a feed back to Inbox must restore the entire library's article list.
+  await page.getByTestId(/^tree-node-feed:/).filter({ hasText: 'P0 Test Feed' }).click();
+  await expect(page.getByRole('button', { name: /Integration Test Article/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Long Summary Article/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Inbox', exact: true }).click();
+  await expect(page.getByRole('button', { name: /Integration Test Article/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Long Summary Article/ })).toBeVisible();
+
   // Capture the compact forms in the same warm Chinese interface as the report.
   await page.goto(`chrome-extension://${extensionId}/options.html#/settings?section=appearance`);
   await page.getByRole('radiogroup', { name: 'Color Theme' }).getByLabel('Quiet Signal').click();

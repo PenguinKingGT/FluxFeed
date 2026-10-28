@@ -22,6 +22,70 @@ function article(id: string): Article {
 }
 
 describe('article store', () => {
+  it.each(['inbox', 'all', 'starred', 'folder'] as const)(
+    'clears the old feed scope when switching to %s',
+    async (view) => {
+      const first = { ...article('a1'), feedId: 'feed-1', isStarred: true };
+      const second = { ...article('a2'), feedId: 'feed-2', isStarred: true };
+      const client = {
+        send: vi.fn().mockImplementation(async (message: { payload?: { feedId?: string } }) => ({
+          success: true,
+          data: {
+            articles: [first, second].filter((item) =>
+              !message.payload?.feedId || item.feedId === message.payload.feedId,
+            ),
+          },
+        })),
+      };
+      const store = createArticleStore(client);
+      await store.getState().loadArticles({ view: 'feed', feedId: 'feed-1', showUnreadOnly: false });
+      expect(store.getState().articles.map((item) => item.id)).toEqual(['a1']);
+      await store.getState().loadArticles({
+        view,
+        folder: view === 'folder' ? 'group-1' : undefined,
+        showUnreadOnly: true,
+      });
+      expect(store.getState().articles.map((item) => item.id)).toEqual(['a1', 'a2']);
+      expect(store.getState().filter.feedId).toBeUndefined();
+    },
+  );
+
+  it.each([true, false])('ignores an obsolete feed reply (success=%s) after loading the inbox', async (success) => {
+    const first = article('a1');
+    const second = { ...article('a2'), feedId: 'feed-2' };
+    let finishFeed: (result: unknown) => void = () => {};
+    const client = {
+      send: vi.fn()
+        .mockReturnValueOnce(new Promise((resolve) => {
+          finishFeed = resolve;
+        }))
+        .mockResolvedValueOnce({ success: true, data: { articles: [first, second] } }),
+    };
+    const store = createArticleStore(client);
+    const pending = store.getState().loadArticles({ view: 'feed', feedId: 'feed-1' });
+    await store.getState().loadArticles({ view: 'inbox' });
+    finishFeed(success
+      ? { success: true, data: { articles: [first] } }
+      : { success: false, error: 'Old feed request failed' });
+    await pending;
+    expect(store.getState().articles.map((item) => item.id)).toEqual(['a1', 'a2']);
+    expect(store.getState().filter.view).toBe('inbox');
+    expect(store.getState().error).toBeNull();
+    expect(store.getState().isLoading).toBe(false);
+  });
+
+  it('retains the current feed when searching or refreshing within its view', async () => {
+    const client = { send: vi.fn().mockResolvedValue({ success: true, data: { articles: [article('a1')] } }) };
+    const store = createArticleStore(client);
+    await store.getState().loadArticles({ view: 'feed', feedId: 'feed-1' });
+    await store.getState().loadArticles({ searchQuery: 'Summary' });
+    expect(store.getState().filter.feedId).toBe('feed-1');
+    expect(store.getState().articles).toHaveLength(1);
+    expect(client.send).toHaveBeenLastCalledWith(expect.objectContaining({
+      payload: expect.objectContaining({ feedId: 'feed-1' }),
+    }));
+  });
+
   it('loads inbox articles with unread filter', async () => {
     const client = {
       send: vi.fn().mockResolvedValue({ success: true, data: { articles: [article('a1')] } }),

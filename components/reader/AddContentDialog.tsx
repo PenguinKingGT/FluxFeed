@@ -120,7 +120,7 @@ export function AddContentDialog({
         // A refresh failure must not suggest repeating a successful subscription.
         const results = await Promise.allSettled([
           loadFeeds(),
-          loadArticles({ view: 'inbox', showUnreadOnly: true }),
+          loadArticles(),
         ]);
         if (results.some((result) => result.status === 'rejected')) {
           toast.error(t('creation.refreshFailed'));

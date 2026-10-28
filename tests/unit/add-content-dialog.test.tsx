@@ -61,6 +61,7 @@ describe('unified content creation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
     await waitFor(() => expect(addFeed).toHaveBeenCalledWith('https://example.com/feed', 'web'));
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(loadArticles).toHaveBeenCalledExactlyOnceWith();
   });
 
   it('offers only legal parents for new folders and submits through Enter', async () => {

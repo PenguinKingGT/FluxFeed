@@ -165,7 +165,7 @@ describe('Reader Sidebar', () => {
 
     await waitFor(() => expect(addFeed).toHaveBeenCalledWith('https://example.com/feed.xml', 'group-2'));
     expect(loadFeeds).toHaveBeenCalled();
-    expect(loadArticles).toHaveBeenCalledWith({ view: 'inbox', showUnreadOnly: true });
+    expect(loadArticles).toHaveBeenCalledWith();
   });
 
   it('confirms recursive root folder deletion', async () => {

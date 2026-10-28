@@ -42,7 +42,9 @@ interface ArticleState {
 
 const DEFAULT_FILTER: ArticleFilter = { view: 'inbox', showUnreadOnly: true };
 
+/** Owns article queries and ensures only the latest requested view can publish results. */
 export function createArticleStore(client: StoreMessageClient) {
+  let latestLoadRequest = 0;
   return createStore<ArticleState>((set, get) => ({
     articles: [],
     activeArticleId: null,
@@ -55,8 +57,16 @@ export function createArticleStore(client: StoreMessageClient) {
     summaryStaleByArticleId: {},
     autoSummaryAttempts: new Set(),
 
+    /** Clears source-specific scope across views while preserving in-view search and refresh. */
     async loadArticles(filterPatch = {}) {
+      const requestId = ++latestLoadRequest;
       const filter = { ...get().filter, ...filterPatch };
+      if (filter.view !== 'feed') {
+        delete filter.feedId;
+      }
+      if (filter.view !== 'folder') {
+        delete filter.folder;
+      }
       set({ filter, isLoading: true, error: null });
       const response = await client.send<{ articles: Article[] }>({
         action: 'ARTICLE_LIST',
@@ -67,6 +77,10 @@ export function createArticleStore(client: StoreMessageClient) {
           onlyStarred: filter.view === 'starred',
         },
       });
+      // Runtime replies may arrive out of order after rapid route or search changes.
+      if (requestId !== latestLoadRequest) {
+        return;
+      }
       if (!response.success) {
         set({ isLoading: false, error: response.error ?? 'Failed to load articles' });
         return;
