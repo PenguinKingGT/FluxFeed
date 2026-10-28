@@ -7,10 +7,27 @@ let context: BrowserContext | undefined;
 let extensionId: string;
 let fixtureServer: Server | undefined;
 let fixtureFeedUrl: string;
+let aiRequests = 0;
+let rejectAiRequests = false;
 
 test.beforeAll(async () => {
   fixtureServer = createServer((request, response) => {
-    if (request.url !== '/feed.xml') {
+    if (request.url === '/ai/chat/completions') {
+      aiRequests += 1;
+      request.resume();
+      response.writeHead(rejectAiRequests ? 500 : 200, {
+        'Content-Type': 'application/json',
+      });
+      response.end(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({
+          overview: `Local AI summary ${aiRequests}`,
+          keyPoints: ['A verified section summary'],
+        }) } }],
+      }));
+      return;
+    }
+    const isLongFeed = request.url === '/long-feed.xml';
+    if (request.url !== '/feed.xml' && !isLongFeed) {
       response.writeHead(404).end();
       return;
     }
@@ -22,16 +39,16 @@ test.beforeAll(async () => {
     response.end(`<?xml version="1.0" encoding="UTF-8"?>
       <rss version="2.0">
         <channel>
-          <title>P0 Test Feed</title>
+          <title>${isLongFeed ? 'Long Article Feed' : 'P0 Test Feed'}</title>
           <description>Local Playwright RSS fixture</description>
           <link>http://127.0.0.1/</link>
           <item>
-            <guid>p0-article-1</guid>
-            <title>Integration Test Article</title>
+            <guid>${isLongFeed ? 'long-article-1' : 'p0-article-1'}</guid>
+            <title>${isLongFeed ? 'Long Summary Article' : 'Integration Test Article'}</title>
             <link>http://127.0.0.1/article-1</link>
             <description>Searchable Playwright summary</description>
             <content:encoded xmlns:content="http://purl.org/rss/1.0/modules/content/"><![CDATA[
-              <p>This article verifies the complete subscription and reading workflow.</p>
+              <p>${isLongFeed ? 'Long article evidence. '.repeat(7200) : 'This article verifies the complete subscription and reading workflow.'}</p>
             ]]></content:encoded>
             <author>FluxFeed Test</author>
             <pubDate>Tue, 28 Jul 2026 12:00:00 GMT</pubDate>
@@ -260,4 +277,54 @@ test('completes the subscription, reading, persistence, search, and deletion wor
 
   await expect(page.getByText('P0 Test Feed', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Integration Test Article/ })).toHaveCount(0);
+});
+
+
+test('summarizes a confirmed article prefix and retains the cache after AI failure', async () => {
+  if (!context) {
+    throw new Error('Extension browser context was not created');
+  }
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const origin = new URL(fixtureFeedUrl).origin;
+  await page.goto(`chrome-extension://${extensionId}/options.html#/settings?section=ai`);
+  await page.getByLabel('API URL').fill(`${origin}/ai/chat/completions`);
+  await page.getByLabel('Model', { exact: true }).fill('local-summary-model');
+  const automaticSummary = page.getByRole('switch', { name: 'Summarize on open' });
+  if (await automaticSummary.isChecked()) {
+    await automaticSummary.click();
+  }
+
+  await page.goto(`chrome-extension://${extensionId}/options.html#/inbox`);
+  await page.getByRole('button', { name: 'Add Feed' }).click();
+  await page.getByLabel('Feed URL').fill(`${origin}/long-feed.xml`);
+  await page.getByRole('button', { name: 'Subscribe' }).click();
+  await page.getByRole('button', { name: /Long Summary Article/ }).click();
+
+  aiRequests = 0;
+  await page.getByRole('button', { name: 'Generate summary' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  expect(aiRequests).toBe(0);
+  await page.getByRole('button', { name: 'Summarize opening portion' }).click();
+  await expect(page.getByText('Local AI summary 6', { exact: true })).toBeVisible();
+  expect(aiRequests).toBe(6);
+  await expect(page.getByText('Partial summary: only the opening portion of the article was processed.')).toBeVisible();
+
+  await page.reload();
+  await page.getByRole('button', { name: /Long Summary Article/ }).click();
+  await expect(page.getByText('Local AI summary 6', { exact: true })).toBeVisible();
+  expect(aiRequests).toBe(6);
+
+  rejectAiRequests = true;
+  try {
+    await page.getByRole('button', { name: 'Regenerate' }).click();
+    await page.getByRole('button', { name: 'Summarize opening portion' }).click();
+    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.getByText('Local AI summary 6', { exact: true })).toBeVisible();
+    expect(aiRequests).toBe(8);
+    await page.screenshot({ path: '/tmp/fluxfeed-long-article-summary.png' });
+  } finally {
+    rejectAiRequests = false;
+    await page.close();
+  }
 });

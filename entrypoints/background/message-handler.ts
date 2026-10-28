@@ -1,3 +1,4 @@
+import { ARTICLE_MAX_CHARACTERS, planArticleSummary } from '@/lib/ai/article-chunker';
 import type { StorageService } from '@/lib/db';
 import {
   createArticleFingerprint,
@@ -99,6 +100,7 @@ interface ArticleSummarizePayload {
   articleId: string;
   contentText: string;
   force?: boolean;
+  allowPartial?: boolean;
   trigger: 'manual' | 'auto';
 }
 
@@ -359,13 +361,18 @@ export async function handleBackgroundMessage(
         if (
           !payload?.articleId
           || typeof payload.contentText !== 'string'
-          || payload.contentText.length > 30000
+          || payload.contentText.length > ARTICLE_MAX_CHARACTERS + 1
           || !['manual', 'auto'].includes(payload.trigger)
         ) {
           return { success: false, error: 'AI_REQUEST_INVALID' };
         }
         const article = await dependencies.storageService.getArticle(payload.articleId);
         if (!article) return { success: false, error: 'ARTICLE_NOT_FOUND' };
+
+        const plan = planArticleSummary(payload.contentText);
+        if (plan.isPartial && (payload.trigger === 'auto' || payload.allowPartial !== true)) {
+          return { success: false, error: 'AI_PARTIAL_CONFIRMATION_REQUIRED' };
+        }
 
         const characterCount = countUnicodeCharacters(payload.contentText);
         if (characterCount < 80) {

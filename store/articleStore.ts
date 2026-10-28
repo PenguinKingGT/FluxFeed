@@ -1,3 +1,4 @@
+import { ARTICLE_MAX_CHARACTERS } from '@/lib/ai/article-chunker';
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 import type { Article, ArticleAiSummary } from '@/lib/types';
@@ -33,7 +34,7 @@ interface ArticleState {
   summarizeArticle(
     articleId: string,
     contentText: string,
-    options: { force?: boolean; trigger: 'manual' | 'auto' },
+    options: { allowPartial?: boolean; force?: boolean; trigger: 'manual' | 'auto' },
   ): Promise<void>;
   goNext(): void;
   goPrev(): void;
@@ -131,6 +132,7 @@ export function createArticleStore(client: StoreMessageClient) {
       }));
     },
 
+    /** Bounds the message payload and keeps cached content unchanged on failure. */
     async summarizeArticle(articleId, contentText, options) {
       const state = get();
       if (state.summaryStatusByArticleId[articleId] === 'loading') return;
@@ -154,7 +156,9 @@ export function createArticleStore(client: StoreMessageClient) {
         action: 'ARTICLE_SUMMARIZE',
         payload: {
           articleId,
-          contentText,
+          // One extra code unit signals omitted content without sending it all.
+          contentText: contentText.slice(0, ARTICLE_MAX_CHARACTERS + 1),
+          allowPartial: options.allowPartial,
           force: options.force,
           trigger: options.trigger,
         },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractSummary, sanitizeHtml } from '@/lib/security/sanitize-html';
+import { extractPlainText, extractSummary, sanitizeHtml } from '@/lib/security/sanitize-html';
 
 describe('sanitizeHtml', () => {
   it('removes scripts and dangerous attributes while preserving reading tags', () => {
@@ -28,4 +28,12 @@ describe('sanitizeHtml', () => {
   it('extracts plain text summary with truncation', () => {
     expect(extractSummary('<p>Hello <strong>world</strong> again</p>', 11)).toBe('Hello world…');
   });
+
+  it('preserves safe paragraph boundaries only when explicitly requested', () => {
+    const html = '<p>First <strong>paragraph</strong></p><script>unsafe()</script><p>Second<br>line</p>';
+    expect(extractPlainText(html, true)).toBe('First paragraph\n\nSecond\nline');
+    expect(extractPlainText(html)).not.toContain('\n');
+    expect(extractPlainText(html, true)).not.toContain('unsafe');
+  });
+
 });

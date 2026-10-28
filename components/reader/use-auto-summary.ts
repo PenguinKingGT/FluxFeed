@@ -1,3 +1,4 @@
+import { planArticleSummary } from '@/lib/ai/article-chunker';
 import { useEffect } from 'react';
 import type { Article, Settings } from '@/lib/types';
 import { countUnicodeCharacters, isAiConfigured } from '@/lib/ai/ai-preferences';
@@ -15,6 +16,7 @@ interface UseAutoSummaryOptions {
   ) => Promise<void>;
 }
 
+/** Automatically requests complete summaries only; partial processing needs consent. */
 export function useAutoSummary({
   article,
   contentText,
@@ -28,11 +30,13 @@ export function useAutoSummary({
   const enabled = ai.autoSummarizeOnOpen;
   const minimum = ai.autoSummarizeMinCharacters;
   const configured = isAiConfigured(ai);
+  const isPartial = planArticleSummary(contentText).isPartial;
   const characterCount = countUnicodeCharacters(contentText);
 
   useEffect(() => {
     if (
       !articleId
+      || isPartial
       || hasSummary
       || !enabled
       || !configured
@@ -50,6 +54,7 @@ export function useAutoSummary({
     contentText,
     enabled,
     hasSummary,
+    isPartial,
     minimum,
     status,
     summarizeArticle,

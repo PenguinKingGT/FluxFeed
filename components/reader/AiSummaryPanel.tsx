@@ -1,7 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AlertCircle, ArrowRight, RefreshCw, Sparkles, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
+import { planArticleSummary } from '@/lib/ai/article-chunker';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { countUnicodeCharacters, isAiConfigured } from '@/lib/ai/ai-preferences';
 import { DEFAULT_SETTINGS } from '@/lib/db';
@@ -18,10 +27,11 @@ interface AiSummaryPanelProps {
   summarizeArticle: (
     articleId: string,
     contentText: string,
-    options: { force?: boolean; trigger: 'manual' | 'auto' },
+    options: { allowPartial?: boolean; force?: boolean; trigger: 'manual' | 'auto' },
   ) => Promise<void>;
 }
 
+/** Displays cached summaries and requires explicit consent for partial processing. */
 export function AiSummaryPanel({
   article,
   contentText,
@@ -32,6 +42,12 @@ export function AiSummaryPanel({
 }: AiSummaryPanelProps) {
   const { t } = useTranslation();
   const summary = article.aiSummary;
+  const plan = useMemo(() => planArticleSummary(contentText), [contentText]);
+  const [pendingConfirmation, setPendingConfirmation] = useState<{
+    articleId: string;
+    contentText: string;
+    force: boolean;
+  } | null>(null);
   const ai = settings.ai ?? DEFAULT_SETTINGS.ai;
   const configured = isAiConfigured(ai);
   const [isSetupPromptDismissed, setIsSetupPromptDismissed] = useState(() => {
@@ -47,6 +63,37 @@ export function AiSummaryPanel({
     && ai.autoSummarizeMinCharacters > 0
     && characterCount < ai.autoSummarizeMinCharacters;
 
+  /** Captures the exact article and text so consent cannot carry to another article. */
+  function requestSummary(force = false) {
+    if (plan.isPartial) {
+      setPendingConfirmation({ articleId: article.id, contentText, force });
+      return;
+    }
+    void summarizeArticle(article.id, contentText, {
+      trigger: 'manual',
+      ...(force ? { force: true } : {}),
+    });
+  }
+
+  /** Submits only after the user accepts the displayed partial-processing scope. */
+  function confirmPartialSummary() {
+    if (
+      !pendingConfirmation
+      || pendingConfirmation.articleId !== article.id
+      || pendingConfirmation.contentText !== contentText
+    ) {
+      setPendingConfirmation(null);
+      return;
+    }
+    void summarizeArticle(article.id, contentText, {
+      trigger: 'manual',
+      allowPartial: true,
+      ...(pendingConfirmation.force ? { force: true } : {}),
+    });
+    setPendingConfirmation(null);
+  }
+
+  /** Persists dismissal of the optional AI setup suggestion. */
   function dismissSetupPrompt() {
     setIsSetupPromptDismissed(true);
     try {
@@ -88,14 +135,55 @@ export function AiSummaryPanel({
           <h2 className="text-sm font-semibold text-foreground">{t('ai.summaryTitle')}</h2>
         </div>
         {summary ? (
-          <Button variant="ghost" size="sm" disabled={status === 'loading'} onClick={() => void summarizeArticle(article.id, contentText, { force: true, trigger: 'manual' })}>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={status === 'loading'}
+            onClick={() => requestSummary(true)}
+          >
             <RefreshCw />
             {t('ai.regenerate')}
           </Button>
         ) : null}
       </div>
 
+      <Dialog
+        open={pendingConfirmation?.articleId === article.id
+          && pendingConfirmation?.contentText === contentText}
+        onOpenChange={(open) => !open && setPendingConfirmation(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('ai.partialTitle')}</DialogTitle>
+            <DialogDescription>{t('ai.partialDescription')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingConfirmation(null)}>
+              {t('dialog.cancel')}
+            </Button>
+            <Button onClick={confirmPartialSummary}>{t('ai.partialConfirm')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="px-5 py-5">
+        {plan.chunks.length > 1 && status !== 'loading' ? (
+          <p className="mb-4 text-xs text-muted-foreground">
+            {t('ai.chunkRequests', { count: plan.estimatedRequests })}
+          </p>
+        ) : null}
+        {plan.isPartial && !summary ? (
+          <p className="mb-4 text-xs text-muted-foreground">{t('ai.partialDescription')}</p>
+        ) : null}
+        {summary?.isPartial ? (
+          <p className="mb-4 text-xs text-muted-foreground">{t('ai.partialSummary')}</p>
+        ) : null}
+        {status === 'error' ? (
+          <p role="alert" className="mb-4 flex items-center gap-2 text-xs text-destructive">
+            <AlertCircle className="size-3.5" />
+            {t('ai.error')}
+          </p>
+        ) : null}
         {status === 'loading' ? (
           <div role="status" aria-label={t('ai.generating')} className="space-y-3">
             <p className="text-xs font-medium text-muted-foreground">{t('ai.generating')}</p>
@@ -132,14 +220,13 @@ export function AiSummaryPanel({
               ) : (
                 <p className="text-sm text-muted-foreground">{t('settings.aiPrivacy')}</p>
               )}
-              {status === 'error' ? (
-                <p role="alert" className="mt-2 flex items-center gap-2 text-xs text-destructive">
-                  <AlertCircle className="size-3.5" />
-                  {t('ai.error')}
-                </p>
-              ) : null}
+
             </div>
-            <Button className="shrink-0" disabled={belowHardMinimum} onClick={() => void summarizeArticle(article.id, contentText, { trigger: 'manual' })}>
+            <Button
+              className="shrink-0"
+              disabled={belowHardMinimum}
+              onClick={() => requestSummary()}
+            >
               <Sparkles />
               {t('ai.generate')}
             </Button>

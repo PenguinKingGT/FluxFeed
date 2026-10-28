@@ -1,3 +1,4 @@
+import { ARTICLE_MAX_CHARACTERS } from '@/lib/ai/article-chunker';
 import { describe, expect, it, vi } from 'vitest';
 import type { Feed } from '@/lib/types';
 import { DEFAULT_SETTINGS } from '@/lib/db';
@@ -611,5 +612,98 @@ describe('background message handler', () => {
     );
 
     expect(response).toEqual({ success: false, error: 'Database unavailable' });
+  });
+});
+
+
+/** Supplies the real handler with observable storage and deterministic AI responses. */
+function summaryDependencies() {
+  const storageService = createStorageService();
+  const oldSummary = { overview: 'Old summary' };
+  storageService.getArticle.mockResolvedValue({
+    id: 'a1', title: 'Article', author: '', aiSummary: oldSummary,
+  });
+  storageService.getSettings.mockResolvedValue({
+    ...DEFAULT_SETTINGS,
+    ai: {
+      ...DEFAULT_SETTINGS.ai,
+      apiUrl: 'https://example.com/v1', model: 'model', autoSummarizeOnOpen: true,
+    },
+  });
+  const complete = vi.fn().mockResolvedValue('{"overview":"New summary","keyPoints":[]}');
+  return {
+    storageService,
+    complete,
+    fetchFeed: vi.fn(), updateBadge: vi.fn(),
+    refreshSingleFeed: vi.fn(), refreshAllFeeds: vi.fn(),
+    aiSecretStorage: {
+      hasApiKey: vi.fn(), getApiKey: vi.fn().mockResolvedValue(''),
+      setApiKey: vi.fn(), clearApiKey: vi.fn(),
+    },
+    createAiClient: vi.fn(() => ({ complete })),
+  };
+}
+
+describe('background long article summaries', () => {
+  it.each([
+    { trigger: 'manual', allowPartial: false },
+    { trigger: 'auto', allowPartial: true },
+  ])('rejects partial processing without manual consent: $trigger', async (options) => {
+    const dependencies = summaryDependencies();
+    const response = await handleBackgroundMessage({
+      action: 'ARTICLE_SUMMARIZE',
+      payload: { articleId: 'a1', contentText: 'A'.repeat(ARTICLE_MAX_CHARACTERS + 1), ...options },
+    }, dependencies);
+    expect(response).toEqual({ success: false, error: 'AI_PARTIAL_CONFIRMATION_REQUIRED' });
+    expect(dependencies.createAiClient).not.toHaveBeenCalled();
+    expect(dependencies.storageService.updateArticle).not.toHaveBeenCalled();
+  });
+
+  it('summarizes more than 30,000 characters and saves only after synthesis', async () => {
+    const dependencies = summaryDependencies();
+    const response = await handleBackgroundMessage({
+      action: 'ARTICLE_SUMMARIZE',
+      payload: { articleId: 'a1', contentText: 'A'.repeat(31000), trigger: 'manual' },
+    }, dependencies);
+    expect(response.success).toBe(true);
+    expect(dependencies.complete).toHaveBeenCalledTimes(3);
+    expect(dependencies.storageService.updateArticle).toHaveBeenCalledOnce();
+    expect(dependencies.storageService.updateArticle).toHaveBeenCalledWith('a1', {
+      aiSummary: expect.objectContaining({ isPartial: false, chunkCount: 2 }),
+    });
+  });
+
+  it('saves explicit partial scope with at most six requests', async () => {
+    const dependencies = summaryDependencies();
+    const response = await handleBackgroundMessage({
+      action: 'ARTICLE_SUMMARIZE',
+      payload: {
+        articleId: 'a1', contentText: 'A'.repeat(ARTICLE_MAX_CHARACTERS + 1),
+        trigger: 'manual', allowPartial: true,
+      },
+    }, dependencies);
+    expect(response.success).toBe(true);
+    expect(dependencies.complete).toHaveBeenCalledTimes(6);
+    expect(dependencies.storageService.updateArticle).toHaveBeenCalledWith('a1', {
+      aiSummary: expect.objectContaining({ isPartial: true, chunkCount: 5 }),
+    });
+  });
+
+  it.each(['chunk', 'synthesis'])('preserves old cache when %s fails', async (phase) => {
+    const dependencies = summaryDependencies();
+    if (phase === 'chunk') {
+      dependencies.complete.mockRejectedValueOnce(new AiRequestError('AI_TIMEOUT'));
+    } else {
+      dependencies.complete
+        .mockResolvedValueOnce('{"overview":"Section one","keyPoints":[]}')
+        .mockResolvedValueOnce('{"overview":"Section two","keyPoints":[]}')
+        .mockRejectedValueOnce(new AiRequestError('AI_TIMEOUT'));
+    }
+    const response = await handleBackgroundMessage({
+      action: 'ARTICLE_SUMMARIZE',
+      payload: { articleId: 'a1', contentText: 'A'.repeat(31000), trigger: 'manual', force: true },
+    }, dependencies);
+    expect(response).toEqual({ success: false, error: 'AI_TIMEOUT' });
+    expect(dependencies.storageService.updateArticle).not.toHaveBeenCalled();
   });
 });

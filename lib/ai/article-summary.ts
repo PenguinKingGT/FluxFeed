@@ -1,6 +1,7 @@
 import type { AiPreferences, Article, ArticleAiSummary } from '@/lib/types';
 import type { AiCompletionClient } from './ai-client';
-import { parseArticleSummary } from './summary-schema';
+import { parseArticleSummary, type ArticleSummaryContent } from './summary-schema';
+import { ARTICLE_SUMMARY_STRATEGY_VERSION, planArticleSummary } from './article-chunker';
 
 export const AI_PROMPT_VERSION = 1 as const;
 
@@ -17,21 +18,26 @@ const LENGTH_LABELS = {
   detailed: 'Keep the overview under 400 words.',
 } as const;
 
+/** Hashes source data and preferences without retaining them in cache keys. */
 export async function createFingerprint(value: string): Promise<string> {
   const bytes = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+/** Includes the processing scope and strategy so partial and legacy caches differ. */
 export async function createArticleFingerprint(
   article: Pick<Article, 'id' | 'title'>,
   contentText: string,
   preferences: AiPreferences,
 ): Promise<string> {
+  const plan = planArticleSummary(contentText);
   return createFingerprint(JSON.stringify({
+    strategyVersion: ARTICLE_SUMMARY_STRATEGY_VERSION,
+    isPartial: plan.isPartial,
     id: article.id,
     title: article.title,
-    contentText,
+    contentText: plan.processedText,
     apiUrl: preferences.apiUrl,
     model: preferences.model,
     language: preferences.summaryLanguage,
@@ -41,6 +47,7 @@ export async function createArticleFingerprint(
   }));
 }
 
+/** Summarizes all selected chunks before atomically producing a final result. */
 export async function generateArticleSummary(
   client: AiCompletionClient,
   article: Pick<Article, 'title' | 'author'>,
@@ -60,23 +67,54 @@ export async function generateArticleSummary(
   const preference = preferences.customInstructions
     ? `Reader preference: ${preferences.customInstructions}`
     : 'No additional reader preference.';
-  const user = [
-    preference,
-    '<article>',
-    `Title: ${article.title}`,
-    `Author: ${article.author || 'Unknown'}`,
-    '<content>',
-    contentText,
-    '</content>',
-    '</article>',
-  ].join('\n');
-  const parsed = parseArticleSummary(await client.complete([
-    { role: 'system', content: system },
-    { role: 'user', content: user },
-  ]));
+  const plan = planArticleSummary(contentText);
+
+  /** Uses the same language and output contract for chunks and final synthesis. */
+  async function completeSummary(text: string, synthesis = false): Promise<ArticleSummaryContent> {
+    const task = synthesis
+      ? 'Merge the ordered section summaries. Remove duplicate points, preserve qualifications, and add no facts.'
+      : 'Summarize this section of the article.';
+    const user = [
+      preference,
+      task,
+      '<article>',
+      `Title: ${article.title}`,
+      `Author: ${article.author || 'Unknown'}`,
+      '<content>',
+      text,
+      '</content>',
+      '</article>',
+    ].join('\n');
+
+    return parseArticleSummary(await client.complete([
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ], { maxTokens: 2000 }), plan.chunks.length > 1);
+  }
+
+  const sections: ArticleSummaryContent[] = [];
+  for (let index = 0; index < plan.chunks.length; index += 2) {
+    // Wait for both in-flight requests before reporting failure. A retry must
+    // not overlap abandoned requests, and no later batch starts after a failure.
+    const results = await Promise.allSettled(
+      plan.chunks.slice(index, index + 2).map((chunk) => completeSummary(chunk)),
+    );
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        throw result.reason;
+      }
+      sections.push(result.value);
+    }
+  }
+
+  const parsed = sections.length === 1
+    ? sections[0]
+    : await completeSummary(JSON.stringify(sections), true);
 
   return {
     ...parsed,
+    isPartial: plan.isPartial,
+    chunkCount: plan.chunks.length,
     generatedAt: now(),
     model: preferences.model,
     sourceFingerprint,

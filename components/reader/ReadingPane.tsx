@@ -30,7 +30,7 @@ interface ReadingPaneProps {
   summarizeArticle?: (
     articleId: string,
     contentText: string,
-    options: { force?: boolean; trigger: 'manual' | 'auto' },
+    options: { allowPartial?: boolean; force?: boolean; trigger: 'manual' | 'auto' },
   ) => Promise<void>;
 }
 
@@ -62,7 +62,10 @@ export function ReadingPane({
   const article = activeIndex >= 0 ? articles[activeIndex] : null;
   const feed = article ? feedById.get(article.feedId) : undefined;
   const folderName = feed?.groupId ? groupById.get(feed.groupId)?.name : undefined;
-  const contentText = useMemo(() => article ? extractPlainText(article.content) : '', [article?.content]);
+  const contentText = useMemo(
+    () => article ? extractPlainText(article.content, true) : '',
+    [article?.content],
+  );
   const summaryStatus = article
     ? summaryStatusByArticleId[article.id] ?? 'idle'
     : 'idle';

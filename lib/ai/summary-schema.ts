@@ -1,3 +1,4 @@
+import { AiRequestError } from './ai-client';
 import { z } from 'zod';
 
 export const articleSummarySchema = z.object({
@@ -7,6 +8,7 @@ export const articleSummarySchema = z.object({
 
 export type ArticleSummaryContent = z.infer<typeof articleSummarySchema>;
 
+/** Removes the optional JSON fence without accepting surrounding commentary. */
 function stripCodeFence(value: string): string {
   const trimmed = value.trim();
   return trimmed
@@ -15,11 +17,15 @@ function stripCodeFence(value: string): string {
     .trim();
 }
 
-export function parseArticleSummary(value: string): ArticleSummaryContent {
+/** Multi-part summaries require valid structure to avoid caching missing sections. */
+export function parseArticleSummary(value: string, strict = false): ArticleSummaryContent {
   const content = stripCodeFence(value);
   try {
     return articleSummarySchema.parse(JSON.parse(content));
   } catch {
+    if (strict) {
+      throw new AiRequestError('AI_RESPONSE_INVALID');
+    }
     return articleSummarySchema.parse({
       overview: content.slice(0, 2000) || 'No summary was returned.',
       keyPoints: [],

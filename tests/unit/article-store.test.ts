@@ -1,3 +1,4 @@
+import { ARTICLE_MAX_CHARACTERS } from '@/lib/ai/article-chunker';
 import { describe, expect, it, vi } from 'vitest';
 import type { Article } from '@/lib/types';
 import { createArticleStore } from '@/store/articleStore';
@@ -123,4 +124,21 @@ describe('article store', () => {
     expect(store.getState().articles[0].aiSummary).toEqual(summary);
     expect(store.getState().summaryStatusByArticleId.a1).toBe('success');
   });
+
+  it('bounds summary messages while retaining partial consent and an overflow sentinel', async () => {
+    const client = { send: vi.fn().mockResolvedValue({ success: false, error: 'AI_TIMEOUT' }) };
+    const store = createArticleStore(client);
+    await store.getState().summarizeArticle('a1', 'A'.repeat(ARTICLE_MAX_CHARACTERS * 2), {
+      trigger: 'manual', allowPartial: true,
+    });
+    expect(client.send).toHaveBeenCalledWith({
+      action: 'ARTICLE_SUMMARIZE',
+      payload: {
+        articleId: 'a1', contentText: 'A'.repeat(ARTICLE_MAX_CHARACTERS + 1),
+        trigger: 'manual', allowPartial: true, force: undefined,
+      },
+    });
+    expect(store.getState().summaryStatusByArticleId.a1).toBe('error');
+  });
+
 });

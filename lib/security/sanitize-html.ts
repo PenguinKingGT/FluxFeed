@@ -83,8 +83,24 @@ export function extractSummary(html: string, maxLength = 200): string {
   return text.length > maxLength ? `${text.slice(0, maxLength).trim()}…` : text;
 }
 
-export function extractPlainText(html: string): string {
+/** Extracts safe source text, optionally retaining paragraph breaks for AI chunks. */
+export function extractPlainText(html: string, preserveParagraphs = false): string {
   const template = document.createElement('template');
   template.innerHTML = sanitizeHtml(html);
+  if (preserveParagraphs) {
+    template.content.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, tr')
+      .forEach((element) => {
+        element.append(document.createTextNode('\n\n'));
+      });
+    template.content.querySelectorAll('br').forEach((element) => {
+      element.replaceWith(document.createTextNode('\n'));
+    });
+    return (template.content.textContent ?? '')
+      .replace(/[^\S\n]+/g, ' ')
+      .replace(/ *\n */g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
   return (template.content.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
