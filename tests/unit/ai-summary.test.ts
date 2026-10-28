@@ -19,6 +19,17 @@ describe('AI article summary', () => {
     });
   });
 
+  it('normalizes legacy visibility and keeps it out of summary fingerprints', async () => {
+    const legacy = { ...DEFAULT_SETTINGS.ai, showArticleSummary: undefined };
+    expect(sanitizeAiPreferences(legacy).showArticleSummary).toBe(true);
+    const hidden = { ...legacy, showArticleSummary: false };
+    expect(sanitizeAiPreferences(hidden).showArticleSummary).toBe(false);
+    const source = { id: 'a1', title: 'Title' };
+    expect(await createArticleFingerprint(source, 'Body', legacy)).toBe(
+      await createArticleFingerprint(source, 'Body', hidden),
+    );
+  });
+
   it('generates structured content and a stable fingerprint', async () => {
     const article = { id: 'a1', title: 'Title', author: 'Author' };
     const fingerprint = await createArticleFingerprint(article, 'Article body', DEFAULT_SETTINGS.ai);

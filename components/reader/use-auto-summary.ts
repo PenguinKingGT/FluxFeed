@@ -27,7 +27,7 @@ export function useAutoSummary({
   const articleId = article?.id ?? null;
   const hasSummary = Boolean(article?.aiSummary);
   const ai = settings.ai ?? DEFAULT_SETTINGS.ai;
-  const enabled = ai.autoSummarizeOnOpen;
+  const enabled = ai.autoSummarizeOnOpen && ai.showArticleSummary !== false;
   const minimum = ai.autoSummarizeMinCharacters;
   const configured = isAiConfigured(ai);
   const isPartial = planArticleSummary(contentText).isPartial;

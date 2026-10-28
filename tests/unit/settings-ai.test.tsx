@@ -68,6 +68,21 @@ describe('AiSection', () => {
     expect((minimum as HTMLInputElement).disabled).toBe(true);
   });
 
+  it('defaults legacy summary visibility to on and preserves other preferences when toggled', async () => {
+    send.mockResolvedValue({ success: true, data: { hasApiKey: false } });
+    render(<StatefulAiSettings />);
+    const toggle = screen.getByRole('switch', { name: 'Show article AI summary' });
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(screen.getByRole('switch', { name: 'Summarize on open' }));
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('switch', { name: 'Summarize on open' }).getAttribute('aria-checked')).toBe('true');
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+  });
+
   it('stores a secret separately and tests the configured endpoint', async () => {
     send
       .mockResolvedValueOnce({ success: true, data: { hasApiKey: false } })

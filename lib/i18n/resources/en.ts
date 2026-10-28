@@ -165,6 +165,8 @@ export const en = {
   'settings.aiInstructionsDescription': 'Optional preferences for focus, tone, or topics.',
   'settings.aiDigestLimit': 'Briefing article limit',
   'settings.aiDigestLimitDescription': 'Higher limits usually require more requests.',
+  'settings.aiShowSummary': 'Show article AI summary',
+  'settings.aiShowSummaryDescription': 'Hiding pauses automatic article summaries. Saved summaries are kept.',
   'settings.aiAutoSummary': 'Summarize on open',
   'settings.aiAutoSummaryDescription': 'Automatically sends eligible article text to your AI service when opened.',
   'settings.aiAutoMinimum': 'Minimum article length',

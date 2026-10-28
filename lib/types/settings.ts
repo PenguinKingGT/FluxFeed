@@ -15,6 +15,8 @@ export interface AiPreferences {
   summaryLength: AiSummaryLength;
   customInstructions: string;
   dailyDigestMaxArticles: 50 | 100 | 200;
+  /** Missing in legacy settings means visible; hiding also pauses automatic summaries. */
+  showArticleSummary?: boolean;
   autoSummarizeOnOpen: boolean;
   autoSummarizeMinCharacters: number;
 }

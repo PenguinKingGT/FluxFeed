@@ -20,6 +20,7 @@ export function sanitizeAiPreferences(value: AiPreferences): AiPreferences {
     dailyDigestMaxArticles: ARTICLE_LIMITS.has(value.dailyDigestMaxArticles)
       ? value.dailyDigestMaxArticles
       : 100,
+    showArticleSummary: value.showArticleSummary !== false,
     autoSummarizeOnOpen: value.autoSummarizeOnOpen,
     autoSummarizeMinCharacters: Math.min(50000, Math.max(0, minimum)),
   };

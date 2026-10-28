@@ -63,6 +63,24 @@ export function AiSummaryPanel({
     && ai.autoSummarizeMinCharacters > 0
     && characterCount < ai.autoSummarizeMinCharacters;
 
+  let emptyNotice: string | undefined;
+  if (belowHardMinimum) {
+    emptyNotice = t('ai.contentTooShort');
+  } else if (belowAutoMinimum) {
+    emptyNotice = t('ai.belowAutoThreshold', {
+      count: characterCount,
+      minimum: ai.autoSummarizeMinCharacters,
+    });
+  }
+  const showDetails = Boolean(
+    summary
+    || status === 'loading'
+    || status === 'error'
+    || plan.chunks.length > 1
+    || plan.isPartial
+    || emptyNotice,
+  );
+
   /** Captures the exact article and text so consent cannot carry to another article. */
   function requestSummary(force = false) {
     if (plan.isPartial) {
@@ -109,7 +127,7 @@ export function AiSummaryPanel({
 
   if (!configured) {
     return (
-      <aside className="mb-10 flex items-center justify-between gap-5 rounded-xl border border-border bg-card/72 px-5 py-4 max-[600px]:items-start max-[600px]:flex-col">
+      <aside className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-border bg-card/72 px-4 py-2.5">
         <div>
           <p className="text-sm font-semibold text-foreground">{t('ai.summaryTitle')}</p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">{t('ai.notConfigured')}</p>
@@ -128,23 +146,21 @@ export function AiSummaryPanel({
   }
 
   return (
-    <aside className="mb-10 overflow-hidden rounded-xl border border-border bg-card/78" aria-label={t('ai.summaryTitle')}>
-      <div className="flex items-center justify-between gap-4 border-b border-border/70 px-5 py-4">
+    <aside className="mb-5 overflow-hidden rounded-lg border border-border bg-card/78" aria-label={t('ai.summaryTitle')}>
+      <div className="flex items-center justify-between gap-3 px-4 py-2">
         <div className="flex items-center gap-2.5">
           <Sparkles className="size-4 text-secondary" />
           <h2 className="text-sm font-semibold text-foreground">{t('ai.summaryTitle')}</h2>
         </div>
-        {summary ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={status === 'loading'}
-            onClick={() => requestSummary(true)}
-          >
-            <RefreshCw />
-            {t('ai.regenerate')}
-          </Button>
-        ) : null}
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={status === 'loading' || (!summary && belowHardMinimum)}
+          onClick={() => requestSummary(Boolean(summary))}
+        >
+          {summary ? <RefreshCw /> : <Sparkles />}
+          {t(summary ? 'ai.regenerate' : 'ai.generate')}
+        </Button>
       </div>
 
       <Dialog
@@ -166,73 +182,57 @@ export function AiSummaryPanel({
         </DialogContent>
       </Dialog>
 
-      <div className="px-5 py-5">
-        {plan.chunks.length > 1 && status !== 'loading' ? (
-          <p className="mb-4 text-xs text-muted-foreground">
-            {t('ai.chunkRequests', { count: plan.estimatedRequests })}
-          </p>
-        ) : null}
-        {plan.isPartial && !summary ? (
-          <p className="mb-4 text-xs text-muted-foreground">{t('ai.partialDescription')}</p>
-        ) : null}
-        {summary?.isPartial ? (
-          <p className="mb-4 text-xs text-muted-foreground">{t('ai.partialSummary')}</p>
-        ) : null}
-        {status === 'error' ? (
-          <p role="alert" className="mb-4 flex items-center gap-2 text-xs text-destructive">
-            <AlertCircle className="size-3.5" />
-            {t('ai.error')}
-          </p>
-        ) : null}
-        {status === 'loading' ? (
-          <div role="status" aria-label={t('ai.generating')} className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground">{t('ai.generating')}</p>
-            <Skeleton className="h-3 w-full" />
-            <Skeleton className="h-3 w-[88%]" />
-            <Skeleton className="h-3 w-[72%]" />
-          </div>
-        ) : summary ? (
-          <div>
-            <p className="font-reading text-[15px] leading-7 text-foreground">{summary.overview}</p>
-            {summary.keyPoints.length > 0 ? (
-              <ul className="mt-5 grid gap-3">
-                {summary.keyPoints.map((point) => (
-                  <li key={point} className="grid grid-cols-[5px_1fr] gap-3 text-sm leading-6 text-foreground">
-                    <span className="mt-2.5 size-1 rounded-full bg-secondary" />
-                    <span>{point}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-              <span>{t('ai.generatedWith', { model: summary.model })}</span>
-              <span>{t('ai.mayBeInaccurate')}</span>
-              {stale ? <span className="text-secondary">{t('ai.settingsChanged')}</span> : null}
+      {/* Empty summaries stay a single row; expand only for content or useful feedback. */}
+      {showDetails ? (
+        <div className="border-t border-border/60 px-4 py-3">
+          {plan.chunks.length > 1 && status !== 'loading' ? (
+            <p className="mb-2 text-xs text-muted-foreground">
+              {t('ai.chunkRequests', { count: plan.estimatedRequests })}
+            </p>
+          ) : null}
+          {plan.isPartial && !summary ? (
+            <p className="mb-2 text-xs text-muted-foreground">{t('ai.partialDescription')}</p>
+          ) : null}
+          {summary?.isPartial ? (
+            <p className="mb-2 text-xs text-muted-foreground">{t('ai.partialSummary')}</p>
+          ) : null}
+          {status === 'error' ? (
+            <p role="alert" className="mb-2 flex items-center gap-2 text-xs text-destructive">
+              <AlertCircle className="size-3.5" />
+              {t('ai.error')}
+            </p>
+          ) : null}
+          {status === 'loading' ? (
+            <div role="status" aria-label={t('ai.generating')} className="space-y-3">
+              <p className="text-xs font-medium text-muted-foreground">{t('ai.generating')}</p>
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-[88%]" />
+              <Skeleton className="h-3 w-[72%]" />
             </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between gap-6 max-[600px]:items-start max-[600px]:flex-col">
+          ) : summary ? (
             <div>
-              {belowHardMinimum ? (
-                <p className="text-sm text-muted-foreground">{t('ai.contentTooShort')}</p>
-              ) : belowAutoMinimum ? (
-                <p className="text-sm text-muted-foreground">{t('ai.belowAutoThreshold', { count: characterCount, minimum: ai.autoSummarizeMinCharacters })}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground">{t('settings.aiPrivacy')}</p>
-              )}
-
+              <p className="font-reading text-[15px] leading-7 text-foreground">{summary.overview}</p>
+              {summary.keyPoints.length > 0 ? (
+                <ul className="mt-3 grid gap-2">
+                  {summary.keyPoints.map((point) => (
+                    <li key={point} className="grid grid-cols-[5px_1fr] gap-3 text-sm leading-6 text-foreground">
+                      <span className="mt-2.5 size-1 rounded-full bg-secondary" />
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                <span>{t('ai.generatedWith', { model: summary.model })}</span>
+                <span>{t('ai.mayBeInaccurate')}</span>
+                {stale ? <span className="text-secondary">{t('ai.settingsChanged')}</span> : null}
+              </div>
             </div>
-            <Button
-              className="shrink-0"
-              disabled={belowHardMinimum}
-              onClick={() => requestSummary()}
-            >
-              <Sparkles />
-              {t('ai.generate')}
-            </Button>
-          </div>
-        )}
-      </div>
+          ) : emptyNotice ? (
+            <p className="text-xs text-muted-foreground">{emptyNotice}</p>
+          ) : null}
+        </div>
+      ) : null}
     </aside>
   );
 }

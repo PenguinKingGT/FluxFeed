@@ -125,7 +125,7 @@ export function createAiModule(dependencies: AiModuleDependencies): AiModule {
     const preferences = await loadPreferences();
     const fingerprint = await createArticleFingerprint(article, input.contentText, preferences);
     if (input.trigger === 'auto') {
-      if (!preferences.autoSummarizeOnOpen) {
+      if (!preferences.autoSummarizeOnOpen || preferences.showArticleSummary === false) {
         throw new AiRequestError('AI_AUTO_SUMMARY_DISABLED');
       }
       if (characterCount < preferences.autoSummarizeMinCharacters) {

@@ -96,6 +96,29 @@ describe('AI module operations', () => {
       }),
     );
   });
+  it('rejects automatic summaries while hidden without contacting the model', async () => {
+    const storageService = createStorageService();
+    storageService.getArticle.mockResolvedValue({ id: 'a1', title: 'Article' });
+    storageService.getSettings.mockResolvedValue({
+      ...DEFAULT_SETTINGS,
+      ai: {
+        ...DEFAULT_SETTINGS.ai,
+        apiUrl: 'https://ai.example/chat',
+        model: 'reader-model',
+        autoSummarizeOnOpen: true,
+        showArticleSummary: false,
+      },
+    });
+    const createAiClient = vi.fn();
+    const response = await execute({
+      action: 'ARTICLE_SUMMARIZE',
+      payload: { articleId: 'a1', contentText: 'A'.repeat(2000), trigger: 'auto' },
+    }, { storageService, createAiClient });
+    expect(response).toEqual({ success: false, error: 'AI_AUTO_SUMMARY_DISABLED' });
+    expect(createAiClient).not.toHaveBeenCalled();
+    expect(storageService.updateArticle).not.toHaveBeenCalled();
+  });
+
   it('enforces the automatic summary character threshold in the background', async () => {
     const storageService = createStorageService();
     storageService.getArticle.mockResolvedValue({ id: 'a1', title: 'Article' });

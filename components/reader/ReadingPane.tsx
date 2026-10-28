@@ -36,6 +36,7 @@ interface ReadingPaneProps {
 
 async function noopSummarizeArticle() {}
 
+/** Keeps article controls compact and respects summary visibility without clearing its cache. */
 export function ReadingPane({
   articles,
   feeds,
@@ -111,8 +112,8 @@ export function ReadingPane({
   return (
     <section ref={paneRef} data-testid="reading-pane" className="reader-reading-pane reading-pane reader-scrollbar relative h-screen min-w-0 flex-1 overflow-y-auto bg-background">
       <article className="reader-content px-8 pb-24">
-        <header className="mb-10">
-          <div className="sticky top-0 z-10 mb-10 flex min-h-16 items-center justify-between gap-4 border-b border-border/70 bg-background/88 py-2 backdrop-blur-xl">
+        <header className="mb-5">
+          <div className="sticky top-0 z-10 mb-5 flex min-h-14 items-center justify-between gap-4 border-b border-border/70 bg-background/88 py-2 backdrop-blur-xl">
             <div className="flex min-w-0 items-center gap-2">
               <Button aria-label={t('navigation.openMenu')} title={t('navigation.openMenu')} className="reader-navigation-trigger rounded-lg text-muted-foreground" variant="ghost" size="icon-sm" onClick={onOpenNavigation}>
                 <Menu />
@@ -137,25 +138,31 @@ export function ReadingPane({
               onToggleFocusMode={onToggleFocusMode}
             />
           </div>
-          <h1 className="reader-title mb-9 font-reading leading-[1.06] font-semibold tracking-[-0.035em] text-foreground">{article.title}</h1>
-          <div className="flex items-center gap-4 border-y border-border/80 py-5">
-            <div className="flex size-11 items-center justify-center overflow-hidden rounded-xl border border-border bg-accent font-serif text-base font-semibold text-accent-foreground">
-              {(article.author || feed?.title || 'F').charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">{article.author || feed?.title || t('reader.unknownAuthor')}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{feed?.title ?? 'FluxFeed'} <span className="mx-1 opacity-40">/</span> {estimateReadMinutes(article.content, settings.language)}</p>
-            </div>
+          <h1 className="reader-title mb-3 font-reading leading-[1.3] font-semibold tracking-[-0.02em] text-foreground">{article.title}</h1>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-5 text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {article.author || feed?.title || t('reader.unknownAuthor')}
+            </span>
+            {feed?.title && article.author && article.author !== feed.title ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{feed.title}</span>
+              </>
+            ) : null}
+            <span aria-hidden="true">·</span>
+            <span>{estimateReadMinutes(article.content, settings.language)}</span>
           </div>
         </header>
-        <AiSummaryPanel
-          article={article}
-          contentText={contentText}
-          settings={settings}
-          status={summaryStatus}
-          stale={summaryStaleByArticleId[article.id] ?? false}
-          summarizeArticle={summarizeArticle}
-        />
+        {settings.ai?.showArticleSummary !== false ? (
+          <AiSummaryPanel
+            article={article}
+            contentText={contentText}
+            settings={settings}
+            status={summaryStatus}
+            stale={summaryStaleByArticleId[article.id] ?? false}
+            summarizeArticle={summarizeArticle}
+          />
+        ) : null}
         <ArticleContent html={article.content} settings={settings} />
         <footer className="mt-24 flex flex-col items-center border-t border-border pt-10">
           <div className="mb-7 text-[10px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">{t('reader.endOfArticle')}</div>

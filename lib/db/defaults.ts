@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS: Settings = {
     summaryLength: 'standard',
     customInstructions: '',
     dailyDigestMaxArticles: 100,
+    showArticleSummary: true,
     autoSummarizeOnOpen: false,
     autoSummarizeMinCharacters: 1000,
   },

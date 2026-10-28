@@ -104,6 +104,7 @@ FluxFeed uses Vercel AI SDK in the extension background runtime to call your sel
 - Long articles are summarized in up to 5 sections of 30,000 UTF-16 code units each, with at most 2 concurrent requests and 6 requests total including synthesis. Articles beyond this limit require confirmation to summarize only the opening portion and skip automatic summarization. Failures preserve the previous summary.
 - Digest work is chunked and has concurrency, input-size, output-size, and timeout limits.
 - Completed summaries are cached locally.
+- Hide article AI summaries in AI settings to pause automatic article summaries while keeping cached results.
 
 ## Privacy and permissions
 

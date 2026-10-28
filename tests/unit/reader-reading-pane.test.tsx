@@ -270,6 +270,71 @@ describe('Reader ReadingPane', () => {
     expect(screen.getByRole('button', { name: 'Regenerate' })).not.toBeNull();
   });
 
+  it('hides cached summaries and pauses automatic requests until shown again', async () => {
+    const summarizeArticle = vi.fn().mockResolvedValue(undefined);
+    const currentArticle = article({
+      content: `<p>${'Readable content '.repeat(100)}</p>`,
+      aiSummary: {
+        overview: 'Saved overview',
+        keyPoints: [],
+        generatedAt: 1,
+        model: 'reader-model',
+        sourceFingerprint: 'fingerprint',
+        promptVersion: 1,
+      },
+    });
+    const configuredSettings: Settings = {
+      ...settings,
+      ai: {
+        ...settings.ai,
+        apiUrl: 'https://ai.example.com/v1',
+        model: 'reader-model',
+        autoSummarizeOnOpen: true,
+        showArticleSummary: false,
+      },
+    };
+    const props = {
+      articles: [currentArticle],
+      feeds: [feed],
+      groups: [group],
+      activeArticleId: 'a1',
+      settings: configuredSettings,
+      isFocusMode: false,
+      markRead,
+      starArticle,
+      goPrev,
+      goNext,
+      onOpenNavigation,
+      onShowArticleList,
+      onToggleFocusMode,
+      summarizeArticle,
+    };
+    const { rerender } = render(<ReadingPane {...props} />);
+    expect(screen.queryByRole('complementary', { name: 'AI Summary' })).toBeNull();
+    expect(screen.queryByText('Saved overview')).toBeNull();
+    expect(screen.getByText(/Readable content/)).not.toBeNull();
+
+    rerender(<ReadingPane {...props} settings={{
+      ...configuredSettings,
+      ai: { ...configuredSettings.ai, showArticleSummary: true },
+    }} />);
+    expect(screen.getByText('Saved overview')).not.toBeNull();
+    expect(summarizeArticle).not.toHaveBeenCalled();
+
+    const uncachedArticles = [{ ...currentArticle, aiSummary: undefined }];
+    rerender(<ReadingPane {...props} articles={uncachedArticles} />);
+    expect(screen.queryByRole('button', { name: 'Generate summary' })).toBeNull();
+    expect(summarizeArticle).not.toHaveBeenCalled();
+
+    rerender(<ReadingPane {...props} articles={uncachedArticles} settings={{
+      ...configuredSettings,
+      ai: { ...configuredSettings.ai, showArticleSummary: true },
+    }} />);
+    await waitFor(() => expect(summarizeArticle).toHaveBeenCalledWith(
+      'a1', expect.any(String), { trigger: 'auto' },
+    ));
+  });
+
   it('automatically summarizes a sufficiently long article once', async () => {
     const summarizeArticle = vi.fn().mockResolvedValue(undefined);
     const configuredSettings: Settings = {

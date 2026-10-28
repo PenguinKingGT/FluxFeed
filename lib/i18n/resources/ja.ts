@@ -167,6 +167,8 @@ export const ja: Record<keyof typeof en, string> = {
   'settings.aiInstructionsDescription': '注目点、文体、テーマを任意で指定します。',
   'settings.aiDigestLimit': 'まとめる記事の上限',
   'settings.aiDigestLimitDescription': '上限が高いほど、通常はリクエストが増えます。',
+  'settings.aiShowSummary': '記事の AI 要約を表示',
+  'settings.aiShowSummaryDescription': '非表示にすると記事の自動要約を停止します。保存済みの要約は保持します。',
   'settings.aiAutoSummary': '記事を開いたら自動要約',
   'settings.aiAutoSummaryDescription': '条件を満たす記事を開くと、本文を AI サービスへ自動送信します。',
   'settings.aiAutoMinimum': '本文の最小文字数',

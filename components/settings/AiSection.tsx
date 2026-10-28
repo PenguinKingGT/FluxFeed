@@ -148,6 +148,14 @@ export function AiSection({ settings, updateSettings }: AiSectionProps) {
           </select>
         </SettingRow>
 
+        <SettingRow label={t('settings.aiShowSummary')} description={t('settings.aiShowSummaryDescription')}>
+          <SettingsToggle
+            checked={ai.showArticleSummary !== false}
+            label={t('settings.aiShowSummary')}
+            onCheckedChange={(checked) => updateAi({ showArticleSummary: checked })}
+          />
+        </SettingRow>
+
         <SettingRow label={t('settings.aiAutoSummary')} description={t('settings.aiAutoSummaryDescription')}>
           <SettingsToggle checked={ai.autoSummarizeOnOpen} label={t('settings.aiAutoSummary')} onCheckedChange={(checked) => updateAi({ autoSummarizeOnOpen: checked })} />
         </SettingRow>

@@ -70,9 +70,20 @@ test.beforeAll(async () => {
       return;
     }
     const isLongFeed = request.url === '/long-feed.xml';
-    if (request.url !== '/feed.xml' && !isLongFeed) {
+    const isReaderFeed = request.url === '/reader-feed.xml';
+    if (request.url !== '/feed.xml' && !isLongFeed && !isReaderFeed) {
       response.writeHead(404).end();
       return;
+    }
+
+    let fixtureTitle = 'Integration Test Article';
+    let fixtureContent = 'This article verifies the complete subscription and reading workflow.';
+    if (isReaderFeed) {
+      fixtureTitle = '科技爱好者周刊（第 412 期）：禁止 issue，只用 PR';
+      fixtureContent = '这里记录每周值得分享的科技内容，让阅读回到内容本身。'.repeat(50);
+    } else if (isLongFeed) {
+      fixtureTitle = 'Long Summary Article';
+      fixtureContent = 'Long article evidence. '.repeat(7200);
     }
 
     response.writeHead(200, {
@@ -87,11 +98,11 @@ test.beforeAll(async () => {
           <link>http://127.0.0.1/</link>
           <item>
             <guid>${isLongFeed ? 'long-article-1' : 'p0-article-1'}</guid>
-            <title>${isLongFeed ? 'Long Summary Article' : 'Integration Test Article'}</title>
+            <title>${fixtureTitle}</title>
             <link>http://127.0.0.1/article-1</link>
             <description>Searchable Playwright summary</description>
             <content:encoded xmlns:content="http://purl.org/rss/1.0/modules/content/"><![CDATA[
-              <p>${isLongFeed ? 'Long article evidence. '.repeat(7200) : 'This article verifies the complete subscription and reading workflow.'}</p>
+              <p>${fixtureContent}</p>
             ]]></content:encoded>
             <author>FluxFeed Test</author>
             <pubDate>Tue, 28 Jul 2026 12:00:00 GMT</pubDate>
@@ -507,5 +518,59 @@ test('creates folders and feeds from the plus menu while keeping the footer feed
   await page.getByLabel('订阅地址').click();
   await expect(page.getByLabel('订阅地址')).toBeFocused();
   await page.screenshot({ path: '/tmp/fluxfeed-add-feed-mobile.png', animations: 'disabled' });
+  await page.close();
+});
+
+
+test('keeps the reader compact and persists summary visibility without deleting cached results', async () => {
+  if (!context) {
+    throw new Error('Extension browser context was not created');
+  }
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const settingsUrl = `chrome-extension://${extensionId}/options.html#/settings?section=ai`;
+  const readerUrl = `chrome-extension://${extensionId}/options.html#/all`;
+  await page.goto(settingsUrl);
+  const autoSummary = page.getByRole('switch', { name: '打开文章时自动总结', exact: true });
+  if (await autoSummary.getAttribute('aria-checked') === 'true') {
+    await autoSummary.click();
+  }
+  await page.goto(readerUrl);
+  await page.getByRole('button', { name: '添加订阅', exact: true }).click();
+  await page.getByLabel('订阅地址').fill(fixtureFeedUrl.replace('/feed.xml', '/reader-feed.xml'));
+  await page.getByRole('button', { name: '订阅', exact: true }).click();
+  const title = '科技爱好者周刊（第 412 期）：禁止 issue，只用 PR';
+  await page.getByRole('button', { name: title, exact: false }).click();
+  const pane = page.getByTestId('reading-pane');
+  const summary = pane.getByRole('complementary', { name: 'AI 摘要' });
+  await expect(summary).toBeVisible();
+  expect(await pane.getByRole('heading', { name: title }).evaluate((element) => parseFloat(getComputedStyle(element).fontSize))).toBeLessThanOrEqual(32);
+  expect((await summary.boundingBox())!.height).toBeLessThanOrEqual(60);
+  expect((await pane.locator('.reader-prose').boundingBox())!.y).toBeLessThan(400);
+  await page.screenshot({ path: '/tmp/fluxfeed-reader-compact.png', animations: 'disabled' });
+  await page.getByRole('button', { name: '生成摘要', exact: true }).click();
+  await expect(summary.getByText(/Native anthropic summary/)).toBeVisible();
+  const savedOverview = await summary.locator('p.font-reading').innerText();
+
+  await page.goto(settingsUrl);
+  await page.getByRole('switch', { name: '显示文章 AI 摘要', exact: true }).click();
+  await autoSummary.click();
+  await page.reload();
+  await expect(page.getByRole('switch', { name: '显示文章 AI 摘要', exact: true })).toHaveAttribute('aria-checked', 'false');
+  await page.goto(readerUrl);
+  await page.getByRole('button', { name: title, exact: false }).click();
+  await expect(summary).toHaveCount(0);
+  expect((await pane.locator('.reader-prose').boundingBox())!.y).toBeLessThan(330);
+  await page.screenshot({ path: '/tmp/fluxfeed-reader-summary-hidden.png', animations: 'disabled' });
+
+  await page.goto(settingsUrl);
+  await page.getByRole('switch', { name: '显示文章 AI 摘要', exact: true }).click();
+  await page.goto(readerUrl);
+  await page.getByRole('button', { name: title, exact: false }).click();
+  await expect(summary.getByText(savedOverview, { exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 700 });
+  await expect.poll(() => pane.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  expect(await pane.getByRole('heading', { name: title }).evaluate((element) => parseFloat(getComputedStyle(element).fontSize))).toBeLessThanOrEqual(28);
+  await page.screenshot({ path: '/tmp/fluxfeed-reader-mobile.png', animations: 'disabled' });
   await page.close();
 });

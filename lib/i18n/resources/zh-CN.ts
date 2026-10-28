@@ -167,6 +167,8 @@ export const zhCN: Record<keyof typeof en, string> = {
   'settings.aiInstructionsDescription': '可选，用于指定关注方向、语气或主题。',
   'settings.aiDigestLimit': '简报文章上限',
   'settings.aiDigestLimitDescription': '上限越高，通常需要更多请求。',
+  'settings.aiShowSummary': '显示文章 AI 摘要',
+  'settings.aiShowSummaryDescription': '隐藏后暂停单篇自动总结，已有摘要会保留。',
   'settings.aiAutoSummary': '打开文章时自动总结',
   'settings.aiAutoSummaryDescription': '打开符合条件的文章后，自动把正文发送到你的 AI 服务。',
   'settings.aiAutoMinimum': '最小正文长度',
