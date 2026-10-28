@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useRef, useState } from 'react';
 import { FileText, FolderOpen, HelpCircle, Inbox, Newspaper, Plus, Settings, Star } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -8,8 +8,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import type { Feed, Group, MessageResponse, TreeNodeMove } from '@/lib/types';
 import { openSupportPage } from './reader-runtime';
-import { AddFeedModal } from './AddFeedModal';
-import { CreateGroupModal } from './CreateGroupModal';
+import { CreationMenu } from './CreationMenu';
+import { AddContentDialog, type CreationMode } from './AddContentDialog';
 import { DeleteTreeNodeModal } from './DeleteTreeNodeModal';
 import { FolderTree, type ReaderTreeNode } from './FolderTree';
 
@@ -37,6 +37,7 @@ const navItems = [
   { id: 'digest' as const, labelKey: 'navigation.dailyDigest', path: '/digest', icon: Newspaper },
 ];
 
+/** Keeps feed creation in the footer and contextual creation beside the folder tree. */
 export function Sidebar({
   currentView,
   activeFeedId,
@@ -53,19 +54,20 @@ export function Sidebar({
 }: SidebarProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [groupParentId, setGroupParentId] = useState<string | undefined>();
-  const [isGroupOpen, setIsGroupOpen] = useState(false);
+  const [creation, setCreation] = useState<{ mode: CreationMode; groupId?: string } | null>(null);
   const [isRailFoldersOpen, setIsRailFoldersOpen] = useState(false);
   const [deleteNode, setDeleteNode] = useState<ReaderTreeNode | undefined>();
-  const groupById = useMemo(() => new Map(groups.map((group) => [group.id, group])), [groups]);
+  const addButton = useRef<HTMLButtonElement>(null);
+  const creationTrigger = useRef<HTMLButtonElement | null>(null);
 
-  function openCreateGroup(parentId?: string) {
+  /** Opens the same creation flow from the global entry or a contextual folder action. */
+  function openCreation(mode: CreationMode = 'feed', groupId?: string, trigger?: HTMLButtonElement | null) {
+    creationTrigger.current = trigger ?? addButton.current;
     setIsRailFoldersOpen(false);
-    setGroupParentId(parentId);
-    setIsGroupOpen(true);
+    setCreation({ mode, groupId });
   }
 
+  /** Closes compact navigation after following a reader destination. */
   function navigateTo(path: string) {
     setIsRailFoldersOpen(false);
     navigate(path);
@@ -126,15 +128,13 @@ export function Sidebar({
             <PopoverContent align="start" side="right" sideOffset={10} className="reader-scrollbar max-h-[72vh] overflow-y-auto rounded-xl p-2">
               <div className="mb-2 flex items-center justify-between px-2 py-1">
                 <p className="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase">{t('navigation.folders')}</p>
-                <Button aria-label={t('tree.createFolder')} title={t('tree.createFolder')} variant="ghost" size="icon-sm" onClick={() => openCreateGroup()}>
-                  <Plus />
-                </Button>
+                <CreationMenu onSelect={(mode, trigger) => openCreation(mode, undefined, trigger)} />
               </div>
               <FolderTree
                 feeds={feeds}
                 groups={groups}
                 activeFeedId={currentView === 'feed' ? activeFeedId : undefined}
-                createGroup={openCreateGroup}
+                addContent={(mode, groupId, trigger) => openCreation(mode, groupId, trigger)}
                 deleteNode={setDeleteNode}
                 moveNode={async (move) => {
                   const response = await moveTreeNode(move);
@@ -149,15 +149,13 @@ export function Sidebar({
         <div className="reader-sidebar-folders mb-6">
           <div className="mb-2 flex items-center justify-between px-3 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
             <span>{t('navigation.folders')}</span>
-            <button aria-label={t('tree.createFolder')} className="rounded-md p-1.5 text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring/60" onClick={() => openCreateGroup()}>
-              <Plus className="size-3.5" strokeWidth={2} />
-            </button>
+            <CreationMenu onSelect={(mode, trigger) => openCreation(mode, undefined, trigger)} />
           </div>
           <FolderTree
             feeds={feeds}
             groups={groups}
             activeFeedId={currentView === 'feed' ? activeFeedId : undefined}
-            createGroup={openCreateGroup}
+            addContent={(mode, groupId, trigger) => openCreation(mode, groupId, trigger)}
             deleteNode={setDeleteNode}
             moveNode={async (move) => {
               const response = await moveTreeNode(move);
@@ -169,7 +167,14 @@ export function Sidebar({
         </div>
       </nav>
       <div className="mt-auto border-t border-sidebar-border px-3 pt-3">
-        <Button aria-label={t('navigation.addFeed')} title={t('navigation.addFeed')} className="reader-sidebar-add mb-3 w-full rounded-lg" size="lg" onClick={() => setIsAddOpen(true)}>
+        <Button
+          ref={addButton}
+          aria-label={t('navigation.addFeed')}
+          title={t('navigation.addFeed')}
+          className="reader-sidebar-add mb-3 w-full rounded-lg"
+          size="lg"
+          onClick={() => openCreation()}
+        >
           <Plus data-icon="inline-start" />
           <span className="reader-sidebar-footer-label">{t('navigation.addFeed')}</span>
         </Button>
@@ -193,13 +198,25 @@ export function Sidebar({
           <span className="reader-sidebar-footer-label">{t('navigation.support')}</span>
         </button>
       </div>
-      <AddFeedModal open={isAddOpen} groups={groups} onOpenChange={setIsAddOpen} addFeed={addFeed} loadFeeds={loadFeeds} />
-      <CreateGroupModal
-        open={isGroupOpen}
-        parentName={groupParentId ? groupById.get(groupParentId)?.name : undefined}
-        onOpenChange={setIsGroupOpen}
-        createGroup={(name) => createGroup(name, groupParentId)}
-      />
+      {creation ? (
+        <AddContentDialog
+          initialMode={creation.mode}
+          initialGroupId={creation.groupId}
+          groups={groups}
+          addFeed={addFeed}
+          createGroup={createGroup}
+          loadFeeds={loadFeeds}
+          onClose={() => setCreation(null)}
+          onRestoreFocus={() => {
+            const target = creationTrigger.current;
+            if (target?.isConnected) {
+              target.focus();
+            } else {
+              addButton.current?.focus();
+            }
+          }}
+        />
+      ) : null}
       <DeleteTreeNodeModal
         open={Boolean(deleteNode)}
         node={deleteNode}

@@ -1,4 +1,6 @@
-import { ChevronDown, ChevronRight, Folder, Plus, Trash2 } from 'lucide-react';
+import type { CreationMode } from './AddContentDialog';
+import { CreationMenu } from './CreationMenu';
+import { ChevronDown, ChevronRight, Folder, Trash2 } from 'lucide-react';
 import { Tree, type MoveHandler, type NodeRendererProps, type RowRendererProps } from 'react-arborist';
 import { useTranslation } from 'react-i18next';
 import type { Feed, Group, MessageResponse, TreeNodeMove } from '@/lib/types';
@@ -19,7 +21,7 @@ interface FolderTreeProps {
   feeds: Feed[];
   groups: Group[];
   activeFeedId?: string;
-  createGroup: (parentId: string) => void;
+  addContent: (mode: CreationMode, groupId: string, trigger: HTMLButtonElement | null) => void;
   deleteNode: (node: ReaderTreeNode) => void;
   moveNode: (move: TreeNodeMove) => Promise<MessageResponse>;
   openFeed: (feedId: string) => void;
@@ -113,7 +115,7 @@ function TreeRow({ attrs, innerRef, children }: RowRendererProps<ReaderTreeNode>
   );
 }
 
-export function FolderTree({ feeds, groups, activeFeedId, createGroup, deleteNode, moveNode, openFeed }: FolderTreeProps) {
+export function FolderTree({ feeds, groups, activeFeedId, addContent, deleteNode, moveNode, openFeed }: FolderTreeProps) {
   const { t } = useTranslation();
   const data = buildReaderTree(groups, feeds);
   const groupById = new Map(groups.map((group) => [group.id, group]));
@@ -182,18 +184,15 @@ export function FolderTree({ feeds, groups, activeFeedId, createGroup, deleteNod
           )}
           <span className="truncate">{dataNode.name}</span>
         </span>
-        <span className="flex shrink-0 items-center opacity-0 transition-opacity group-hover/tree-node:opacity-100">
-          {canCreateChild ? (
-            <button
-              aria-label={t('tree.createSubfolder', { name: dataNode.name })}
-              className="rounded p-1 hover:bg-muted"
-              onClick={(event) => {
-                event.stopPropagation();
-                createGroup(dataNode.rawId);
-              }}
-            >
-              <Plus className="size-3.5" />
-            </button>
+        <span className="flex shrink-0 items-center opacity-0 transition-opacity group-hover/tree-node:opacity-100 group-focus-within/tree-node:opacity-100">
+          {isFolder ? (
+            <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+              <CreationMenu
+                label={t('creation.addInFolder', { name: dataNode.name })}
+                allowFolder={canCreateChild}
+                onSelect={(mode, trigger) => addContent(mode, dataNode.rawId, trigger)}
+              />
+            </span>
           ) : null}
           <button
             aria-label={t(isFolder ? 'tree.deleteFolder' : 'tree.deleteFeed', { name: dataNode.name })}

@@ -19,7 +19,7 @@ AI is optional. If you enable it, FluxFeed connects directly to your configured 
 
 ## Features
 
-- **Feed subscriptions:** add feed URLs directly or subscribe to feeds discovered on the current page.
+- **Feed subscriptions:** add feed URLs directly or subscribe to feeds discovered on the current page. The sidebar folder “+” menu adds feeds or folders in place; the bottom Add Feed button opens the feed form directly.
 - **Local library:** organize subscriptions in nested folders and move data with OPML import/export.
 - **Focused reading:** search full article content, mark items read, star stories, and open originals in the background.
 - **Responsive layout:** full three-column reading on wide screens, compact navigation on laptops, and single-pane reading on narrow windows.

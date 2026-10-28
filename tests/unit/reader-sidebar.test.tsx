@@ -94,6 +94,7 @@ describe('Reader Sidebar', () => {
 
   it('expands folders, creates child folders, and opens feeds by feed route', async () => {
     const prompt = vi.spyOn(window, 'prompt');
+    const user = userEvent.setup();
 
     render(
       <MemoryRouter initialEntries={['/inbox']}>
@@ -102,12 +103,14 @@ describe('Reader Sidebar', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByLabelText('Create folder'));
+    await user.click(screen.getByRole('button', { name: 'Add feed or folder' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Create folder' }));
     fireEvent.change(screen.getByLabelText('Folder name'), { target: { value: 'Design' } });
     fireEvent.click(screen.getByText('Create folder', { selector: 'button' }));
     await waitFor(() => expect(createGroup).toHaveBeenNthCalledWith(1, 'Design', undefined));
 
-    fireEvent.click(screen.getByLabelText('Create subfolder in Technology'));
+    await user.click(screen.getByLabelText('Add in Technology'));
+    await user.click(screen.getByRole('menuitem', { name: 'Create folder' }));
     fireEvent.change(screen.getByLabelText('Folder name'), { target: { value: 'Frontend' } });
     fireEvent.click(screen.getByText('Create folder', { selector: 'button' }));
     await waitFor(() => expect(createGroup).toHaveBeenNthCalledWith(2, 'Frontend', 'group-1'));
@@ -157,7 +160,7 @@ describe('Reader Sidebar', () => {
       target: { value: 'https://example.com/feed.xml' },
     });
     await user.click(screen.getByRole('combobox', { name: 'Folder' }));
-    await user.click(screen.getByRole('option', { name: '— Design' }));
+    await user.click(screen.getByRole('option', { name: 'Technology / Design' }));
     fireEvent.click(screen.getByText('Subscribe'));
 
     await waitFor(() => expect(addFeed).toHaveBeenCalledWith('https://example.com/feed.xml', 'group-2'));

@@ -138,7 +138,7 @@ test('renders the options reader and settings hash route', async () => {
   await page.goto(`chrome-extension://${extensionId}/options.html`);
   await expect(page.getByTestId('reader-layout')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Add Feed' }).click();
+  await page.getByRole('button', { name: 'Add Feed', exact: true }).click();
   const feedUrlInput = page.getByLabel('Feed URL');
   const folderSelect = page.getByRole('combobox', { name: 'Folder' });
   const folderSelectTrigger = page.locator('[data-slot="select-trigger"]');
@@ -281,7 +281,7 @@ test('completes the subscription, reading, persistence, search, and deletion wor
   await page.setViewportSize({ width: 1600, height: 900 });
   await page.goto(`chrome-extension://${extensionId}/options.html#/inbox`);
 
-  await page.getByRole('button', { name: 'Add Feed' }).click();
+  await page.getByRole('button', { name: 'Add Feed', exact: true }).click();
   await page.getByLabel('Feed URL').fill(fixtureFeedUrl);
   await page.getByRole('button', { name: 'Subscribe' }).click();
 
@@ -339,7 +339,7 @@ test('summarizes a confirmed article prefix and retains the cache after AI failu
   }
 
   await page.goto(`chrome-extension://${extensionId}/options.html#/inbox`);
-  await page.getByRole('button', { name: 'Add Feed' }).click();
+  await page.getByRole('button', { name: 'Add Feed', exact: true }).click();
   await page.getByLabel('Feed URL').fill(`${origin}/long-feed.xml`);
   await page.getByRole('button', { name: 'Subscribe' }).click();
   await page.getByRole('button', { name: /Long Summary Article/ }).click();
@@ -425,3 +425,79 @@ for (const fixture of [
     await page.close();
   });
 }
+
+test('creates folders and feeds from the plus menu while keeping the footer feed-only', async () => {
+  if (!context) {
+    throw new Error('Extension browser context was not created');
+  }
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
+  await expect(page.getByRole('button', { name: 'Add Feed', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Add feed or folder', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: 'Add Feed', exact: true })).toBeVisible();
+  await page.getByRole('menuitem', { name: 'Create folder', exact: true }).click();
+  await page.getByLabel('Folder name').fill('Reading');
+  await page.getByLabel('Folder name').press('Enter');
+  await expect(page.getByRole('dialog')).toBeHidden();
+
+  const folder = page.getByTestId(/^tree-node-folder:/).filter({ hasText: 'Reading' });
+  await folder.hover();
+  await page.getByRole('button', { name: 'Add in Reading', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Add Feed', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Folder', exact: true })).toContainText('Reading');
+  await page.getByLabel('Feed URL').fill(fixtureFeedUrl);
+  await page.getByRole('button', { name: 'Subscribe', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await expect(page.getByRole('button', { name: /Integration Test Article/ })).toBeVisible();
+
+  await folder.hover();
+  await page.getByRole('button', { name: 'Add in Reading', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Create folder', exact: true }).click();
+  await page.getByLabel('Folder name').fill('Engineering');
+  await page.getByRole('button', { name: 'Create folder', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await page.getByTestId(/^tree-node-folder:/).filter({ hasText: 'Engineering' }).hover();
+  await page.getByRole('button', { name: 'Add in Engineering', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: 'Create folder', exact: true })).toHaveCount(0);
+  await page.getByRole('menuitem', { name: 'Add Feed', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Folder', exact: true })).toContainText('Reading / Engineering');
+  await page.keyboard.press('Escape');
+
+  // Capture the compact forms in the same warm Chinese interface as the report.
+  await page.goto(`chrome-extension://${extensionId}/options.html#/settings?section=appearance`);
+  await page.getByRole('radiogroup', { name: 'Color Theme' }).getByLabel('Quiet Signal').click();
+  await page.getByRole('group', { name: 'Appearance Mode' }).getByLabel('Light').click();
+  await page.getByRole('combobox', { name: 'Language', exact: true }).click();
+  await page.getByRole('option', { name: '简体中文', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
+  await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
+  await page.getByRole('button', { name: '添加订阅', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('radiogroup')).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.screenshot({ path: '/tmp/fluxfeed-add-feed-compact.png', animations: 'disabled' });
+  await page.getByLabel('订阅地址').fill('https://example.com/unsaved');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: '添加订阅', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: '添加订阅', exact: true }).click();
+  await expect(page.getByLabel('订阅地址')).toHaveValue('');
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: '添加订阅或目录', exact: true }).click();
+  await expect(page.getByRole('menu')).toBeVisible();
+  await page.screenshot({ path: '/tmp/fluxfeed-folder-add-menu.png', animations: 'disabled' });
+  await page.getByRole('menuitem', { name: '创建目录', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.screenshot({ path: '/tmp/fluxfeed-create-folder-compact.png', animations: 'disabled' });
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({ width: 390, height: 700 });
+  await page.getByRole('button', { name: '打开导航', exact: true }).click();
+  await page.getByRole('button', { name: '添加订阅', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect.poll(async () => dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await expect(dialog.getByRole('button', { name: '订阅', exact: true })).toBeVisible();
+  await page.getByLabel('订阅地址').click();
+  await expect(page.getByLabel('订阅地址')).toBeFocused();
+  await page.screenshot({ path: '/tmp/fluxfeed-add-feed-mobile.png', animations: 'disabled' });
+  await page.close();
+});

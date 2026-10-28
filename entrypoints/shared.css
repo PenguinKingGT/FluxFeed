@@ -460,7 +460,8 @@ html[data-color-theme='forest'].dark {
 @media (max-width: 1099px) {
   .reader-layout .reader-sidebar {
     position: fixed;
-    z-index: 60;
+    /* Navigation stays below shared dialog and popover portals at layer 50. */
+    z-index: 40;
     width: 15rem;
     transform: translateX(-100%);
     box-shadow: 18px 0 48px color-mix(in srgb, var(--foreground) 16%, transparent);
@@ -473,7 +474,7 @@ html[data-color-theme='forest'].dark {
   .reader-layout[data-navigation-open='true'] .reader-navigation-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 50;
+    z-index: 30;
     display: block;
     border: 0;
     background: color-mix(in srgb, var(--foreground) 26%, transparent);
