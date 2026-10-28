@@ -65,7 +65,6 @@ export function DeleteTreeNodeModal({ open, node, onOpenChange, onDelete }: Dele
               <DialogDescription className="wrap-break-word">
                 {t(isFolder ? 'delete.folderDescription' : 'delete.feedDescription')}
               </DialogDescription>
-              <p className="text-sm font-medium text-destructive">{t('delete.irreversible')}</p>
             </div>
           </div>
         </DialogHeader>

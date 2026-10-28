@@ -190,8 +190,7 @@ describe('Reader Sidebar', () => {
 
     expect(screen.getByRole('dialog')).not.toBeNull();
     expect(screen.getByText('Delete “Technology”?')).not.toBeNull();
-    expect(screen.getByText('This permanently deletes this folder, all nested folders, every feed inside them, and all associated articles.')).not.toBeNull();
-    expect(screen.getByText('This action cannot be undone.')).not.toBeNull();
+    expect(screen.getByText('Everything in this folder will also be deleted, including subfolders, subscriptions, and articles.')).not.toBeNull();
     expect(screen.queryByText('No direct feeds will be moved.')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete folder' }));
@@ -221,7 +220,7 @@ describe('Reader Sidebar', () => {
 
     fireEvent.click(screen.getByLabelText('Delete feed Example'));
 
-    expect(screen.getByText('This permanently deletes this feed and all associated articles.')).not.toBeNull();
+    expect(screen.getByText('You will stop receiving updates, and saved articles from this subscription will also be deleted.')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Delete feed' }));
 
     await waitFor(() => expect(removeFeed).toHaveBeenCalledWith('f1'));
