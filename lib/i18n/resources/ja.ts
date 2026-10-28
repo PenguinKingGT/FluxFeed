@@ -1,7 +1,7 @@
 import type { en } from './en';
 
 export const ja: Record<keyof typeof en, string> = {
-  'app.subtitle': 'フィードリーダー',
+  'app.subtitle': 'RSSリーダー',
   'navigation.inbox': '受信トレイ',
   'navigation.starred': 'スター付き',
   'navigation.allArticles': 'すべての記事',
@@ -215,9 +215,11 @@ export const ja: Record<keyof typeof en, string> = {
   'settings.importInvalid': '有効な OPML ファイルではありません。',
   'settings.saveFailed': '設定を保存できませんでした。以前の値が引き続き有効です。',
   'settings.shortcuts': 'ショートカット',
-  'settings.nextPrevious': '次の記事 / 前の記事',
+  'settings.previousArticle': '前の記事',
+  'settings.nextArticle': '次の記事',
+  'settings.openOriginal': '原文を開く',
+  'settings.toggleFocusMode': 'フォーカスモード切替',
   'settings.markRead': '既読にする',
-  'settings.openBackground': 'バックグラウンドで開く',
   'settings.starUnstar': 'スター / 解除',
   'popup.openDashboard': 'リーダーを開く',
   'popup.feedDetected': 'このページでフィードを検出しました',

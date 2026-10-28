@@ -60,7 +60,7 @@ describe('SettingsLayout', () => {
 
     expect(screen.getByText('FluxFeed')).not.toBeNull();
     expect(screen.getByAltText('FluxFeed')).not.toBeNull();
-    expect(screen.getByText('Feed Reader')).not.toBeNull();
+    expect(screen.getByText('RSS Reader')).not.toBeNull();
     expect(screen.getByText('Options')).not.toBeNull();
     expect(screen.getByText('Configure your reading experience and manage your data.')).not.toBeNull();
     expect(screen.getByText('Settings').closest('button')?.className).toContain('bg-sidebar-primary');
@@ -72,7 +72,7 @@ describe('SettingsLayout', () => {
     expect(screen.getByText('Refresh Interval')).not.toBeNull();
     expect(screen.getByText('Color Theme')).not.toBeNull();
     expect(screen.getByText('Import OPML')).not.toBeNull();
-    expect(screen.getByText('Next / Previous Article')).not.toBeNull();
+    expect(screen.getByText('Previous article')).not.toBeNull();
     expect(screen.queryByText('About')).toBeNull();
   });
 

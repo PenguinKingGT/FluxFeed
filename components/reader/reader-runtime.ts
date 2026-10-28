@@ -15,8 +15,9 @@ export function createReaderUrl(runtime: ReaderUrlRuntime, hashPath = ''): strin
   return `${runtime.getURL('options.html')}${hash}`;
 }
 
+/** Opens the original article in a new tab and brings it to the foreground. */
 export async function openArticleUrl(url: string, runtime: ReaderTabsRuntime = browser): Promise<void> {
-  await runtime.tabs.create({ url, active: false });
+  await runtime.tabs.create({ url, active: true });
 }
 
 export async function openSupportPage(runtime: ReaderTabsRuntime = browser): Promise<void> {

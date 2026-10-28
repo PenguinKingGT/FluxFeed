@@ -8,12 +8,12 @@ describe('reader runtime helpers', () => {
     expect(createReaderUrl(runtime, '/inbox')).toBe('chrome-extension://id/options.html#/inbox');
   });
 
-  it('opens article url in an inactive tab', async () => {
+  it('opens article url in an active tab', async () => {
     const tabs = { create: vi.fn() };
 
     await openArticleUrl('https://example.com/post', { tabs });
 
-    expect(tabs.create).toHaveBeenCalledWith({ url: 'https://example.com/post', active: false });
+    expect(tabs.create).toHaveBeenCalledWith({ url: 'https://example.com/post', active: true });
   });
 
   it('opens the GitHub support page', async () => {

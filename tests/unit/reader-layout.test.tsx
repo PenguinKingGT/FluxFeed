@@ -113,23 +113,81 @@ describe('ReaderLayout', () => {
     expect(loadUnreadCount).toHaveBeenCalled();
     expect(screen.getByText('7')).not.toBeNull();
 
-    fireEvent.keyDown(window, { key: 'j' });
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
     expect(goNext).toHaveBeenCalled();
-    fireEvent.keyDown(window, { key: 'k' });
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
     expect(goPrev).toHaveBeenCalled();
     fireEvent.keyDown(window, { key: 'm' });
     expect(markRead).toHaveBeenCalledWith('a1');
     fireEvent.keyDown(window, { key: 's' });
     expect(starArticle).toHaveBeenCalledWith('a1', true);
-    fireEvent.keyDown(window, { key: 'v' });
+    fireEvent.keyDown(window, { key: 'Enter' });
     expect(openArticleUrl).toHaveBeenCalledWith('https://example.com/post');
     fireEvent.keyDown(window, { key: 'f' });
     expect(screen.getByTestId('reader-layout').getAttribute('data-focus-mode')).toBe('true');
     expect(window.localStorage.getItem('fluxfeed:reader-layout:v1')).toBe('{"focusMode":true}');
 
     const input = screen.getByPlaceholderText('Search articles...');
-    fireEvent.keyDown(input, { key: 'j' });
+    fireEvent.keyDown(input, { key: 'ArrowRight' });
     expect(goNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps reading shortcuts working after clicking an article card', () => {
+    render(
+      <MemoryRouter initialEntries={['/all']}>
+        <ReaderLayout view="all" />
+      </MemoryRouter>,
+    );
+    const card = screen.getByRole('button', { name: /Active/ });
+    fireEvent.click(card);
+    card.focus();
+    fireEvent.keyDown(card, { key: 'ArrowRight' });
+    expect(goNext).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(card, { key: 'ArrowLeft' });
+    expect(goPrev).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(card, { key: 'm' });
+    expect(markRead).toHaveBeenCalledWith('a1');
+    fireEvent.keyDown(card, { key: 's' });
+    expect(starArticle).toHaveBeenCalledWith('a1', true);
+    fireEvent.keyDown(card, { key: 'Enter' });
+    expect(openArticleUrl).toHaveBeenCalledWith('https://example.com/post');
+  });
+
+  it('keeps shortcuts away from controls, editable content, dialogs, and modifier combinations', () => {
+    render(
+      <MemoryRouter initialEntries={['/all']}>
+        <ReaderLayout view="all" />
+      </MemoryRouter>,
+    );
+    for (const tag of ['button', 'a', 'select', 'textarea', 'input']) {
+      const control = document.createElement(tag);
+      document.body.append(control);
+      fireEvent.keyDown(control, { key: 'Enter' });
+      fireEvent.keyDown(control, { key: 'ArrowRight' });
+      control.remove();
+    }
+    const editable = document.createElement('div');
+    editable.setAttribute('contenteditable', 'true');
+    document.body.append(editable);
+    fireEvent.keyDown(editable, { key: 'Enter' });
+    editable.remove();
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    document.body.append(dialog);
+    fireEvent.keyDown(window, { key: 'Enter' });
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    dialog.remove();
+    fireEvent.keyDown(window, { key: 'Enter', repeat: true });
+    fireEvent.keyDown(window, { key: 'ArrowRight', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 'Enter', metaKey: true });
+    fireEvent.keyDown(window, { key: 'Enter', isComposing: true });
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
+    fireEvent.keyDown(window, { key: 'j' });
+    fireEvent.keyDown(window, { key: 'k' });
+    fireEvent.keyDown(window, { key: 'v' });
+    expect(goNext).not.toHaveBeenCalled();
+    expect(goPrev).not.toHaveBeenCalled();
+    expect(openArticleUrl).not.toHaveBeenCalled();
   });
 
   it('opens responsive navigation and closes it with Escape', () => {

@@ -8,12 +8,13 @@ describe('settings static sections', () => {
   it('renders shortcuts with kbd styling', () => {
     render(<ShortcutsSection />);
 
-    expect(screen.getByText('Next / Previous Article')).not.toBeNull();
+    expect(screen.getByText('Previous article')).not.toBeNull();
+    expect(screen.getByText('Next article')).not.toBeNull();
     expect(screen.getByText('Mark as Read')).not.toBeNull();
-    expect(screen.getByText('Open in Background')).not.toBeNull();
+    expect(screen.getByText('Open original')).not.toBeNull();
     expect(screen.getByText('Star / Unstar')).not.toBeNull();
-    expect(screen.getByText('J').className).toContain('bg-accent');
-    expect(screen.getByText('J').className).toContain('font-mono');
+    expect(screen.getByText('←').className).toContain('bg-accent');
+    expect(screen.getByText('←').className).toContain('font-mono');
   });
 
 });

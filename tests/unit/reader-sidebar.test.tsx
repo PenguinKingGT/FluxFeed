@@ -75,7 +75,7 @@ describe('Reader Sidebar', () => {
 
     expect(screen.getByText('FluxFeed')).not.toBeNull();
     expect(screen.getByAltText('FluxFeed')).not.toBeNull();
-    expect(screen.getByText('Feed Reader')).not.toBeNull();
+    expect(screen.getByText('RSS Reader')).not.toBeNull();
     expect(screen.getByText('Inbox')).not.toBeNull();
     expect(screen.getByText('Starred')).not.toBeNull();
     expect(screen.getByText('All Articles')).not.toBeNull();

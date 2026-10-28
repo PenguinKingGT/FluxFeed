@@ -10,6 +10,7 @@ interface ArticleCardProps {
   onSelect: (articleId: string) => void;
 }
 
+/** Selects articles by click or Space; Enter on the active card opens the original. */
 export function ArticleCard({ article, feed, isActive, onSelect }: ArticleCardProps) {
   const source = feed?.title ?? 'Unknown Feed';
   const tags = getArticleTags(article);
@@ -17,6 +18,8 @@ export function ArticleCard({ article, feed, isActive, onSelect }: ArticleCardPr
   return (
     <article
       role="button"
+      data-reader-article-id={article.id}
+      data-active={isActive}
       tabIndex={0}
       className={cn(
         'interactive-row group relative cursor-pointer border-b border-border/80 px-5 py-4 outline-none hover:bg-muted/70 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60',
@@ -25,7 +28,7 @@ export function ArticleCard({ article, feed, isActive, onSelect }: ArticleCardPr
       )}
       onClick={() => onSelect(article.id)}
       onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
+        if (event.key === ' ' || (event.key === 'Enter' && !isActive)) {
           event.preventDefault();
           onSelect(article.id);
         }

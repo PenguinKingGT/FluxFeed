@@ -1,7 +1,7 @@
 <div align="center">
   <img src="./assets/flux-feed.svg" width="88" height="88" alt="FluxFeed logo">
   <h1>FluxFeed</h1>
-  <p>A calm, local-first feed reader for the browser, with optional bring-your-own AI summaries.</p>
+  <p>A calm, local-first RSS reader for the browser, with optional bring-your-own AI summaries.</p>
 
   <p>
     English · <a href="./README.zh-CN.md">简体中文</a> · <a href="./README.ja.md">日本語</a>
@@ -21,7 +21,7 @@ AI is optional. If you enable it, FluxFeed connects directly to your configured 
 
 - **Feed subscriptions:** add feed URLs directly or subscribe to feeds discovered on the current page. The sidebar folder “+” menu adds feeds or folders in place; the bottom Add Feed button opens the feed form directly.
 - **Local library:** organize subscriptions in nested folders and move data with OPML import/export.
-- **Focused reading:** search full article content, mark items read, star stories, and open originals in the background. Inbox shows unread articles by default; All Articles includes read articles too.
+- **Focused reading:** search full article content, mark items read, star stories, and switch directly to originals in a new tab. Inbox shows unread articles by default; All Articles includes read articles too.
 - **Responsive layout:** full three-column reading on wide screens, compact navigation on laptops, and single-pane reading on narrow windows.
 - **Focus mode:** hide navigation and the article list when you want an uninterrupted reading surface.
 - **Optional AI summaries:** generate a summary for one article manually or automatically above a configurable length.
@@ -122,10 +122,10 @@ Shortcuts work while the reader is focused and you are not typing in a form fiel
 
 | Key | Action |
 | --- | --- |
-| `J` / `K` | Next / previous article |
+| `←` / `→` | Previous / next article |
 | `M` | Mark the current article as read |
 | `S` | Star / unstar the current article |
-| `V` | Open the original article in the background |
+| `Enter` | Open the original article and switch to its new tab |
 | `F` | Enter / exit focus mode |
 
 ## Project structure

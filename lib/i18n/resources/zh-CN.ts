@@ -1,7 +1,7 @@
 import type { en } from './en';
 
 export const zhCN: Record<keyof typeof en, string> = {
-  'app.subtitle': '订阅阅读器',
+  'app.subtitle': 'RSS阅读器',
   'navigation.inbox': '收件箱',
   'navigation.starred': '已收藏',
   'navigation.allArticles': '全部文章',
@@ -215,9 +215,11 @@ export const zhCN: Record<keyof typeof en, string> = {
   'settings.importInvalid': '该文件不是有效的 OPML 文档。',
   'settings.saveFailed': '设置保存失败，之前的值仍然有效。',
   'settings.shortcuts': '快捷键',
-  'settings.nextPrevious': '下一篇 / 上一篇',
+  'settings.previousArticle': '上一篇',
+  'settings.nextArticle': '下一篇',
+  'settings.openOriginal': '打开原文',
+  'settings.toggleFocusMode': '切换专注模式',
   'settings.markRead': '标记为已读',
-  'settings.openBackground': '在后台打开',
   'settings.starUnstar': '收藏 / 取消收藏',
   'popup.openDashboard': '打开阅读器',
   'popup.feedDetected': '当前页面检测到订阅源',

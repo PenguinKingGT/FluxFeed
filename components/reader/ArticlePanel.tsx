@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Menu, RefreshCw, Search, SearchX, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -26,6 +26,7 @@ export function ArticlePanel({ articles, feeds, activeArticleId, filter, isLoadi
   const [query, setQuery] = useState(filter.searchQuery ?? '');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
+  const pendingFocusId = useRef<string | null>(null);
   const feedById = useMemo(() => new Map(feeds.map((feed) => [feed.id, feed])), [feeds]);
   const estimatedArticleHeight = 164;
   const rowVirtualizer = useVirtualizer({
@@ -36,6 +37,37 @@ export function ArticlePanel({ articles, feeds, activeArticleId, filter, isLoadi
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
   const renderedItems = virtualItems.length > 0 ? virtualItems : articles.map((_, index) => ({ key: index, index, start: index * estimatedArticleHeight, size: estimatedArticleHeight }));
+
+  // Keep list focus with the selected article, including rows outside the virtual window.
+  useLayoutEffect(() => {
+    const focusedCard = document.activeElement?.closest('[data-reader-article-id]');
+    pendingFocusId.current = null;
+    if (!activeArticleId || !focusedCard || !parentRef.current?.contains(focusedCard)) {
+      return;
+    }
+    const index = articles.findIndex((article) => article.id === activeArticleId);
+    if (index >= 0) {
+      pendingFocusId.current = activeArticleId;
+      rowVirtualizer.scrollToIndex(index, { align: 'auto' });
+    }
+  }, [activeArticleId, articles, rowVirtualizer]);
+
+  useLayoutEffect(() => {
+    if (!pendingFocusId.current) {
+      return;
+    }
+    const focused = document.activeElement;
+    if (focused && focused !== document.body && !focused.closest('[data-reader-article-id]')) {
+      pendingFocusId.current = null;
+      return;
+    }
+    const card = Array.from(parentRef.current?.querySelectorAll<HTMLElement>('[data-reader-article-id]') ?? [])
+      .find((element) => element.dataset.readerArticleId === pendingFocusId.current);
+    if (card) {
+      card.focus({ preventScroll: true });
+      pendingFocusId.current = null;
+    }
+  }, [activeArticleId, virtualItems]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setFilter({ searchQuery: query }), 300);

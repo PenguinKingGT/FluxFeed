@@ -2,20 +2,23 @@ import { Keyboard } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { SectionHeader } from './SectionHeader';
 
+/** Lists each reading action with its current keyboard shortcut. */
 export function ShortcutsSection() {
   const { t } = useTranslation();
   const shortcuts = [
-    { action: t('settings.nextPrevious'), keys: ['J', 'K'] },
+    { action: t('settings.previousArticle'), keys: ['←'] },
+    { action: t('settings.nextArticle'), keys: ['→'] },
+    { action: t('settings.openOriginal'), keys: ['Enter'] },
     { action: t('settings.markRead'), keys: ['M'] },
-    { action: t('settings.openBackground'), keys: ['V'] },
     { action: t('settings.starUnstar'), keys: ['S'] },
+    { action: t('settings.toggleFocusMode'), keys: ['F'] },
   ];
   return (
     <section id="shortcuts" className="scroll-mt-6 overflow-hidden rounded-2xl border border-border bg-card/88 shadow-[0_16px_50px_color-mix(in_srgb,var(--foreground)_4%,transparent)]">
       <SectionHeader icon={<Keyboard className="size-4" />} label={t('settings.shortcuts')} />
-      <div className="grid grid-cols-2 gap-x-8 px-6 py-4">
+      <div className="grid grid-cols-2 gap-x-8 px-6 py-3 max-[720px]:grid-cols-1">
         {shortcuts.map((shortcut) => (
-          <div key={shortcut.action} className="flex items-center justify-between gap-4 border-b border-border/60 py-3 last:border-b-0">
+          <div key={shortcut.action} className="flex items-center justify-between gap-4 py-2.5">
             <span className="text-xs leading-5 text-muted-foreground">{shortcut.action}</span>
             <div className="flex gap-1">
               {shortcut.keys.map((key) => (

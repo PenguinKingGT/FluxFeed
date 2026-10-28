@@ -84,21 +84,40 @@ export function ReaderLayout({ view }: ReaderLayoutProps) {
   }, [loadGroups]);
 
   useEffect(() => {
+    /** Leaves form controls, dialogs, browser shortcuts, and scrolling in charge of their keys. */
     function handleKeyDown(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName)) return;
+      if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+        return;
+      }
 
       if (event.key === 'Escape' && isNavigationOpen) {
         setIsNavigationOpen(false);
         event.preventDefault();
         return;
       }
-      if (event.key === 'j') {
+      const target = event.target;
+      const control = target instanceof Element
+        ? target.closest(
+          'input, textarea, select, button, a, [role="button"], [role="radio"], [role="switch"], [role="combobox"], [contenteditable]:not([contenteditable="false"])',
+        )
+        : null;
+      // Article cards are reader surfaces; their button role must not suppress shortcuts.
+      const articleCard = target instanceof Element
+        ? target.closest('article[data-reader-article-id]')
+        : null;
+      if (
+        (control && control !== articleCard)
+        || document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')
+        || (event.repeat && !['ArrowLeft', 'ArrowRight'].includes(event.key))
+      ) {
+        return;
+      }
+      if (event.key === 'ArrowRight') {
         goNext();
         event.preventDefault();
         return;
       }
-      if (event.key === 'k') {
+      if (event.key === 'ArrowLeft') {
         goPrev();
         event.preventDefault();
         return;
@@ -119,7 +138,7 @@ export function ReaderLayout({ view }: ReaderLayoutProps) {
         event.preventDefault();
         return;
       }
-      if (event.key === 'v') {
+      if (event.key === 'Enter') {
         void openArticleUrl(activeArticle.url);
         event.preventDefault();
       }

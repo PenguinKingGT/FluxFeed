@@ -69,6 +69,11 @@ test.beforeAll(async () => {
       }));
       return;
     }
+    if (request.url === '/article-1') {
+      response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      response.end('<!doctype html><title>Original article</title><p>Original article content.</p>');
+      return;
+    }
     const isLongFeed = request.url === '/long-feed.xml';
     const isReaderFeed = request.url === '/reader-feed.xml';
     if (request.url !== '/feed.xml' && !isLongFeed && !isReaderFeed) {
@@ -99,7 +104,7 @@ test.beforeAll(async () => {
           <item>
             <guid>${isLongFeed ? 'long-article-1' : 'p0-article-1'}</guid>
             <title>${fixtureTitle}</title>
-            <link>http://127.0.0.1/article-1</link>
+            <link>${fixtureFeedUrl.replace('/feed.xml', '/article-1')}</link>
             <description>Searchable Playwright summary</description>
             <content:encoded xmlns:content="http://purl.org/rss/1.0/modules/content/"><![CDATA[
               <p>${fixtureContent}</p>
@@ -641,5 +646,58 @@ test('keeps the reader compact and persists summary visibility without deleting 
   await expect.poll(() => pane.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   expect(await pane.getByRole('heading', { name: title }).evaluate((element) => parseFloat(getComputedStyle(element).fontSize))).toBeLessThanOrEqual(28);
   await page.screenshot({ path: '/tmp/fluxfeed-reader-mobile.png', animations: 'disabled' });
+  await page.close();
+});
+
+test('imports from compact data controls and opens originals in a foreground tab', async () => {
+  if (!context) {
+    throw new Error('Extension browser context was not created');
+  }
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`chrome-extension://${extensionId}/options.html#/settings?section=data`);
+  const dataSection = page.locator('#data');
+  const importButton = dataSection.getByRole('button', { name: '导入 OPML', exact: true });
+  const exportButton = dataSection.getByRole('button', { name: '导出 OPML', exact: true });
+  expect((await importButton.boundingBox())!.height).toBeLessThanOrEqual(44);
+  expect((await exportButton.boundingBox())!.height).toBeLessThanOrEqual(44);
+  const chooserPromise = page.waitForEvent('filechooser');
+  await importButton.focus();
+  await page.keyboard.press('Enter');
+  const chooser = await chooserPromise;
+  await chooser.setFiles({
+    name: 'subscriptions.opml',
+    mimeType: 'text/xml',
+    buffer: Buffer.from(`<opml><body><outline xmlUrl="${fixtureFeedUrl}" /></body></opml>`),
+  });
+  await expect(dataSection.getByRole('status')).toContainText('已导入 0，跳过 1，失败 0');
+  const downloadPromise = page.waitForEvent('download');
+  await exportButton.click();
+  expect((await downloadPromise).suggestedFilename()).toMatch(/^fluxfeed-.*\.opml$/);
+  await dataSection.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/fluxfeed-data-shortcuts-compact.png', animations: 'disabled' });
+
+  await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
+  const cards = page.locator('[data-reader-article-id]');
+  await expect(cards.nth(1)).toBeVisible();
+  const secondTitle = await cards.nth(1).locator('h3').innerText();
+  await cards.first().click();
+  await page.keyboard.press('ArrowRight');
+  await expect(cards.nth(1)).toBeFocused();
+  await expect(page.getByTestId('reading-pane').getByRole('heading', { level: 1 })).toHaveText(secondTitle);
+  await page.keyboard.press('ArrowLeft');
+  await expect(cards.first()).toBeFocused();
+  await page.getByRole('button', { name: /Integration Test Article/ }).click();
+  const originalPromise = context.waitForEvent('page');
+  await page.keyboard.press('Enter');
+  const original = await originalPromise;
+  const originalUrl = fixtureFeedUrl.replace('/feed.xml', '/article-1');
+  await original.waitForURL(originalUrl);
+  const worker = context.serviceWorkers()[0];
+  // Query the extension runtime to verify activation, not only creation of a new tab.
+  await expect.poll(async () => worker.evaluate<string | undefined>(
+    'chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(tabs => tabs[0]?.url)',
+  )).toBe(originalUrl);
+  await original.close();
   await page.close();
 });
