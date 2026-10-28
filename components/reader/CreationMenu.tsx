@@ -39,7 +39,7 @@ export function CreationMenu({ label, allowFolder = true, onSelect }: CreationMe
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
-          align="end"
+          align="start"
           sideOffset={6}
           className="z-50 min-w-44 rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg"
           onCloseAutoFocus={(event) => {

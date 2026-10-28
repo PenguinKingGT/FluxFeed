@@ -38,7 +38,9 @@ describe('AppearanceSection', () => {
 
     expect(screen.getByText('Color Theme')).not.toBeNull();
     expect(screen.getByRole('radiogroup', { name: 'Color Theme' })).not.toBeNull();
-    expect(screen.getByRole('radio', { name: 'Quiet Signal' }).getAttribute('data-state')).toBe('checked');
+    expect(screen.getByRole('radio', { name: 'Paper' }).getAttribute('data-state')).toBe('checked');
+    fireEvent.click(screen.getByRole('radio', { name: 'White' }));
+    expect(updateSettings).toHaveBeenCalledWith({ colorTheme: 'white' });
     fireEvent.click(screen.getByText('Graphite'));
     expect(updateSettings).toHaveBeenCalledWith({ colorTheme: 'graphite' });
 

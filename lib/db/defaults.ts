@@ -12,7 +12,7 @@ export const DEFAULT_SETTINGS: Settings = {
   interfaceFont: 'system-sans',
   fontSize: 'medium',
   markReadOnOpen: true,
-  showUnreadOnly: false,
+  showUnreadOnly: true,
   ai: {
     provider: 'openai-compatible',
     apiUrl: '',

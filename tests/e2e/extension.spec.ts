@@ -182,7 +182,67 @@ test('renders the options reader and settings hash route', async () => {
 
   const colorThemeGroup = page.getByRole('radiogroup', { name: 'Color Theme' });
   const appearanceModeGroup = page.getByRole('group', { name: 'Appearance Mode' });
-  await expect(colorThemeGroup.getByLabel('Quiet Signal')).toBeChecked();
+  await expect(colorThemeGroup.getByLabel('Paper')).toBeChecked();
+  await colorThemeGroup.getByLabel('White').click();
+  const unreadInbox = page.getByRole('switch', { name: 'Unread Inbox', exact: true });
+  await expect(unreadInbox).toBeChecked();
+  // Keep subsequent cross-feed navigation checks inclusive of already-read fixtures.
+  await unreadInbox.click();
+  await appearanceModeGroup.getByLabel('Light').click();
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(page.getByRole('button', { name: 'Add Feed', exact: true })).toHaveCSS('background-color', 'rgb(37, 107, 214)');
+  await expect(page.locator('body')).toHaveCSS('background-image', 'none');
+  await expect(page.locator('.surface-noise')).toHaveCSS('background-image', 'none');
+  await expect(page.locator('.reader-sidebar')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await colorThemeGroup.getByLabel('White').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(colorThemeGroup.getByLabel('Sky')).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect(colorThemeGroup.getByLabel('Sky')).toBeChecked();
+  await page.keyboard.press('Home');
+  await expect(colorThemeGroup.getByLabel('Paper')).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect(colorThemeGroup.getByLabel('Paper')).toBeChecked();
+  await colorThemeGroup.getByLabel('White').click();
+  await expect(colorThemeGroup.getByLabel('White')).toBeChecked();
+  expect((await colorThemeGroup.boundingBox())!.height).toBeLessThanOrEqual(90);
+  await colorThemeGroup.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/fluxfeed-white-theme.png', animations: 'disabled' });
+  await page.setViewportSize({ width: 900, height: 700 });
+  await colorThemeGroup.scrollIntoViewIfNeeded();
+  const themeGroupBox = (await colorThemeGroup.boundingBox())!;
+  for (const radio of await colorThemeGroup.getByRole('radio').all()) {
+    const box = (await radio.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(themeGroupBox.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(themeGroupBox.x + themeGroupBox.width);
+  }
+  await page.screenshot({ path: '/tmp/fluxfeed-theme-narrow.png', animations: 'disabled' });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await appearanceModeGroup.getByLabel('Dark').click();
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(21, 21, 21)');
+  await page.reload();
+  await expect(colorThemeGroup.getByLabel('White')).toBeChecked();
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(21, 21, 21)');
+  await expect(unreadInbox).not.toBeChecked();
+
+  for (const palette of [
+    { name: 'Sky', id: 'sky', background: 'rgb(245, 251, 255)', primary: 'rgb(28, 115, 189)', darkPrimary: 'rgb(140, 200, 255)' },
+    { name: 'Mint', id: 'mint', background: 'rgb(244, 252, 247)', primary: 'rgb(22, 129, 93)', darkPrimary: 'rgb(126, 219, 178)' },
+    { name: 'Peach', id: 'peach', background: 'rgb(255, 248, 243)', primary: 'rgb(188, 86, 46)', darkPrimary: 'rgb(255, 186, 148)' },
+  ]) {
+    await appearanceModeGroup.getByLabel('Light').click();
+    await colorThemeGroup.getByLabel(palette.name).click();
+    await expect(page.locator('body')).toHaveCSS('background-color', palette.background);
+    const addFeedButton = page.getByRole('button', { name: 'Add Feed', exact: true });
+    await expect(addFeedButton).toHaveCSS('background-color', palette.primary);
+    await colorThemeGroup.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `/tmp/fluxfeed-theme-${palette.id}.png`, animations: 'disabled' });
+    await appearanceModeGroup.getByLabel('Dark').click();
+    await expect(addFeedButton).toHaveCSS('background-color', palette.darkPrimary);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-color-theme', palette.id);
+    await expect(colorThemeGroup.getByLabel(palette.name)).toBeChecked();
+  }
   await colorThemeGroup.getByLabel('Graphite').click();
   await appearanceModeGroup.getByLabel('Dark').click();
   await expect(page.locator('html')).toHaveAttribute('data-color-theme', 'graphite');
@@ -227,6 +287,15 @@ test('renders the options reader and settings hash route', async () => {
   await expect(page.getByLabel('Large 19px')).toHaveAttribute('data-state', 'on');
   await expect(page.getByRole('radiogroup', { name: 'Reading Font' }).getByLabel('LXGW WenKai')).toBeChecked();
   await expect(page.getByRole('radiogroup', { name: 'Interface Font' }).getByLabel('LXGW WenKai')).toBeChecked();
+  expect((await readingFontGroup.boundingBox())!.height).toBeLessThanOrEqual(45);
+  expect((await interfaceFontGroup.boundingBox())!.height).toBeLessThanOrEqual(45);
+  await readingFontGroup.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/fluxfeed-fonts-compact-light.png', animations: 'disabled' });
+  await appearanceModeGroup.getByLabel('Dark').click();
+  await readingFontGroup.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/fluxfeed-fonts-compact-dark.png', animations: 'disabled' });
+  await appearanceModeGroup.getByLabel('Light').click();
+
 });
 
 test('adapts the reader chrome to laptop and narrow widths', async () => {
@@ -485,7 +554,7 @@ test('creates folders and feeds from the plus menu while keeping the footer feed
 
   // Capture the compact forms in the same warm Chinese interface as the report.
   await page.goto(`chrome-extension://${extensionId}/options.html#/settings?section=appearance`);
-  await page.getByRole('radiogroup', { name: 'Color Theme' }).getByLabel('Quiet Signal').click();
+  await page.getByRole('radiogroup', { name: 'Color Theme' }).getByLabel('Paper').click();
   await page.getByRole('group', { name: 'Appearance Mode' }).getByLabel('Light').click();
   await page.getByRole('combobox', { name: 'Language', exact: true }).click();
   await page.getByRole('option', { name: '简体中文', exact: true }).click();

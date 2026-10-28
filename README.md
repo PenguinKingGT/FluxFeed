@@ -21,12 +21,12 @@ AI is optional. If you enable it, FluxFeed connects directly to your configured 
 
 - **Feed subscriptions:** add feed URLs directly or subscribe to feeds discovered on the current page. The sidebar folder “+” menu adds feeds or folders in place; the bottom Add Feed button opens the feed form directly.
 - **Local library:** organize subscriptions in nested folders and move data with OPML import/export.
-- **Focused reading:** search full article content, mark items read, star stories, and open originals in the background.
+- **Focused reading:** search full article content, mark items read, star stories, and open originals in the background. Inbox shows unread articles by default; All Articles includes read articles too.
 - **Responsive layout:** full three-column reading on wide screens, compact navigation on laptops, and single-pane reading on narrow windows.
 - **Focus mode:** hide navigation and the article list when you want an uninterrupted reading surface.
 - **Optional AI summaries:** generate a summary for one article manually or automatically above a configurable length.
 - **Today's Briefing:** summarize today's articles in batches, browse topic groups, and jump back to the local story.
-- **Appearance controls:** three color themes, system/light/dark modes, adjustable body text, and separate reading/interface fonts.
+- **Appearance controls:** seven color themes (Paper by default, plus bright Sky, Mint, and Peach), system/light/dark modes, adjustable body text, and separate reading/interface fonts.
 - **Multilingual UI:** English, Simplified Chinese, and Japanese.
 - **Chrome and Firefox builds:** produced from the same WXT codebase.
 

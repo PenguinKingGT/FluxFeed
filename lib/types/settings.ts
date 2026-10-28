@@ -1,6 +1,13 @@
 export type ReadingFont = 'system-serif' | 'system-sans' | 'lxgw-wenkai';
 export type InterfaceFont = 'system-sans' | 'lxgw-wenkai';
-export type ColorTheme = 'quiet-signal' | 'graphite' | 'forest';
+export type ColorTheme =
+  | 'white'
+  | 'sky'
+  | 'mint'
+  | 'peach'
+  | 'quiet-signal'
+  | 'graphite'
+  | 'forest';
 export type AiSummaryLanguage = 'auto' | 'zh-CN' | 'en' | 'ja';
 export type AiSummaryLength = 'brief' | 'standard' | 'detailed';
 
