@@ -1,3 +1,4 @@
+import { createSummaryInstructions } from './summary-instructions';
 import type {
   AiPreferences,
   DailyDigest,
@@ -5,8 +6,9 @@ import type {
   DailyDigestScope,
   DailyDigestStats,
 } from '@/lib/types';
-import { AiRequestError, type AiCompletionClient } from './ai-client';
-import { AI_PROMPT_VERSION, createFingerprint } from './article-summary';
+import { AiRequestError } from './ai-errors';
+import type { AiCompletionClient } from './completion';
+import { AI_PROMPT_VERSION, createFingerprint } from './fingerprint';
 import { chunkDigestArticles, mapWithConcurrency, type DigestArticleInput } from './digest-chunker';
 import {
   parseDigestChunk,
@@ -14,6 +16,7 @@ import {
   type DigestSynthesisContent,
 } from './digest-schema';
 
+/** Preserves completed entries when the remote synthesis cannot be used. */
 function createFallbackSynthesis(entries: DailyDigestEntry[]) {
   const articleIdsByTopic = new Map<string, string[]>();
   for (const entry of entries) {
@@ -42,10 +45,12 @@ function createFallbackSynthesis(entries: DailyDigestEntry[]) {
   };
 }
 
+/** Separates caches by local day, timezone, and article scope. */
 export function createDailyDigestId(dayKey: string, timeZone: string, scope: DailyDigestScope): string {
   return `${dayKey}:${encodeURIComponent(timeZone)}:${scope}`;
 }
 
+/** Invalidates synthesis caches when source data or output preferences change. */
 export async function createDailyDigestFingerprint(
   articles: DigestArticleInput[],
   preferences: AiPreferences,
@@ -54,10 +59,12 @@ export async function createDailyDigestFingerprint(
   scope: DailyDigestScope,
 ): Promise<string> {
   return createFingerprint(JSON.stringify({
+    synthesisVersion: 2,
     dayKey,
     timeZone,
     scope,
     articles,
+    provider: preferences.provider ?? 'openai-compatible',
     apiUrl: preferences.apiUrl,
     model: preferences.model,
     language: preferences.summaryLanguage,
@@ -67,6 +74,7 @@ export async function createDailyDigestFingerprint(
   }));
 }
 
+/** Estimates requests with the same chunking rules used for generation. */
 export function getDailyDigestStats(totalArticles: number, processedArticles: DigestArticleInput[]): DailyDigestStats {
   const chunkCount = chunkDigestArticles(processedArticles).length;
   return {
@@ -77,6 +85,7 @@ export function getDailyDigestStats(totalArticles: number, processedArticles: Di
   };
 }
 
+/** Generates bounded batches and a final overview without writing any cache. */
 export async function generateDailyDigest(
   client: AiCompletionClient,
   input: {
@@ -102,6 +111,7 @@ export async function generateDailyDigest(
             'Return JSON only in this exact shape:',
             '{"entries":[{"articleId":"unchanged input ID","brief":"short summary","whyItMatters":"short relevance note or empty string","topics":["up to 3 short topic names"]}],"topicHints":["up to 8 short topic names"]}',
             'Include every supplied article exactly once and keep every articleId unchanged.',
+            ...createSummaryInstructions(input.preferences),
           ].join('\n'),
         },
         {
@@ -164,12 +174,14 @@ export async function generateDailyDigest(
           'Return JSON only in this exact shape:',
           '{"overview":"daily overview","topics":[{"name":"short topic name","overview":"short topic overview","articleIds":["unchanged article IDs"]}]}',
           'Use only supplied articleIds and keep them unchanged.',
+          ...createSummaryInstructions(input.preferences),
         ].join('\n'),
       },
       {
         role: 'user',
         content: JSON.stringify({
           dayKey: input.dayKey,
+          readerPreference: input.preferences.customInstructions,
           entries: entries.map((entry) => ({
             articleId: entry.articleId,
             brief: entry.brief,

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AiSection } from '@/components/settings/AiSection';
@@ -34,6 +35,17 @@ const settings: Settings = {
   },
 };
 
+/** Applies settings patches so provider-switch behavior is exercised as in the page. */
+function StatefulAiSettings() {
+  const [current, setCurrent] = useState(settings);
+  return (
+    <AiSection
+      settings={current}
+      updateSettings={(patch) => setCurrent((previous) => ({ ...previous, ...patch }))}
+    />
+  );
+}
+
 describe('AiSection', () => {
   afterEach(() => {
     cleanup();
@@ -45,7 +57,7 @@ describe('AiSection', () => {
     const updateSettings = vi.fn();
 
     render(<AiSection settings={settings} updateSettings={updateSettings} />);
-    await waitFor(() => expect(send).toHaveBeenCalledWith({ action: 'AI_CREDENTIAL_STATUS' }));
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ action: 'AI_CREDENTIAL_STATUS', payload: { provider: 'openai-compatible' } }));
 
     fireEvent.click(screen.getByRole('switch', { name: 'Summarize on open' }));
     expect(updateSettings).toHaveBeenCalledWith({
@@ -70,12 +82,53 @@ describe('AiSection', () => {
     await waitFor(() => {
       expect(send).toHaveBeenCalledWith({
         action: 'AI_CREDENTIAL_UPDATE',
-        payload: { apiKey: 'local-secret' },
+        payload: { apiKey: 'local-secret', provider: 'openai-compatible' },
       });
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Test connection' }));
     await waitFor(() => expect(send).toHaveBeenCalledWith({ action: 'AI_CONNECTION_TEST' }));
+  });
+
+
+  it('resets endpoint/model and isolates typed keys when switching native providers', async () => {
+    send.mockImplementation(async (message: { action: string; payload?: { provider: string } }) => ({
+      success: true,
+      data: { hasApiKey: message.payload?.provider === 'openai-compatible' },
+    }));
+    render(<StatefulAiSettings />);
+    await waitFor(() => expect(screen.getByText('A key is saved')).toBeTruthy());
+    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'unsaved-previous-key' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Claude' }));
+    await waitFor(() => expect(send).toHaveBeenCalledWith({
+      action: 'AI_CREDENTIAL_STATUS', payload: { provider: 'anthropic' },
+    }));
+    expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('API URL') as HTMLInputElement).value).toBe('https://api.anthropic.com/v1');
+    expect((screen.getByLabelText('API Key') as HTMLInputElement).value).toBe('');
+    await waitFor(() => expect((screen.getByLabelText('API Key') as HTMLInputElement).disabled).toBe(false));
+    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'anthropic-test-key' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save key' }));
+    await waitFor(() => expect(send).toHaveBeenCalledWith({
+      action: 'AI_CREDENTIAL_UPDATE', payload: { apiKey: 'anthropic-test-key', provider: 'anthropic' },
+    }));
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Gemini' }));
+    await waitFor(() => expect(send).toHaveBeenCalledWith({
+      action: 'AI_CREDENTIAL_STATUS', payload: { provider: 'google' },
+    }));
+    expect((screen.getByLabelText('API URL') as HTMLInputElement).value)
+      .toBe('https://generativelanguage.googleapis.com/v1beta');
+    expect((screen.getByLabelText('API Key') as HTMLInputElement).value).toBe('');
+  });
+
+  it('allows the official native endpoint when no URL override is provided', async () => {
+    send.mockResolvedValue({ success: true, data: { hasApiKey: false } });
+    render(<AiSection settings={{
+      ...settings,
+      ai: { ...settings.ai, provider: 'google', apiUrl: '', model: 'native-model' },
+    }} updateSettings={vi.fn()} />);
+    expect((screen.getByRole('button', { name: 'Test connection' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
 });

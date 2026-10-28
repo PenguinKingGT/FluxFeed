@@ -15,7 +15,7 @@
 
 FluxFeed brings RSS, Atom, and JSON Feed reading into a focused browser workspace. Subscriptions, articles, folders, preferences, and cached summaries stay in your browser. There is no FluxFeed account or hosted synchronization service.
 
-AI is optional. If you enable it, FluxFeed connects directly to an OpenAI-compatible service that you configure. You keep control of the endpoint, model, API key, and when content is summarized.
+AI is optional. If you enable it, FluxFeed connects directly to your configured OpenAI-compatible service, Gemini, or Claude. You keep control of the endpoint, model, API key, and when content is summarized.
 
 ## Features
 
@@ -84,15 +84,17 @@ Temporary Firefox extensions are removed when Firefox closes.
 
 ## Configure AI summaries
 
-AI features are disabled until you provide a compatible service:
+Configure a provider before using AI features:
 
 1. Open **Settings → AI Summaries**.
-2. Enter an OpenAI-compatible base URL ending in `/v1`, or the full Chat Completions endpoint.
+2. Select **OpenAI-compatible**, **Gemini**, or **Claude**. Compatible services accept a `/v1` base URL or complete Chat Completions endpoint; Gemini and Claude use native protocols with official default base URLs and optional proxy overrides.
 3. Enter the model name accepted by that service.
-4. Optionally save an API key and run **Test connection**.
+4. Save the selected provider’s API key and run **Test connection**. Keys are optional for compatible local services, and required for native Gemini and Claude.
 5. Choose summary language, length, digest limit, and whether long articles should be summarized automatically.
 
-FluxFeed currently supports the OpenAI-compatible Chat Completions protocol. Native Anthropic or Gemini APIs, custom request headers, streaming, and chat follow-ups are not supported.
+FluxFeed supports OpenAI-compatible Chat Completions, native Gemini, and native Claude Messages. Custom request headers, streaming, and chat follow-ups are not supported. Switching providers resets the endpoint and model; API keys are stored separately for each provider, and existing compatible settings and keys remain usable.
+
+FluxFeed uses Vercel AI SDK in the extension background runtime to call your selected provider directly. No Vercel account or AI Gateway is required. SDK retries and telemetry are disabled.
 
 ### Request behavior
 
@@ -106,7 +108,7 @@ FluxFeed currently supports the OpenAI-compatible Chat Completions protocol. Nat
 ## Privacy and permissions
 
 - Feeds, articles, folders, settings, and generated summaries are stored locally in IndexedDB.
-- The optional AI API key is stored separately in `browser.storage.local` and is not included in OPML exports or returned to the page state.
+- AI API keys are stored separately by provider in `browser.storage.local` and are not included in OPML exports or returned to the page state.
 - AI requests are sent only from the extension background process to the endpoint you configure.
 - Article excerpts leave the browser only when you manually request a summary or enable automatic summarization.
 - FluxFeed does not include analytics or a hosted account service.

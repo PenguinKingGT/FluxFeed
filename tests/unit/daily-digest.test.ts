@@ -198,12 +198,20 @@ describe('daily digest generation', () => {
         contentExcerpt: 'Large original body',
       }],
       totalArticles: 1,
-      preferences: { ...DEFAULT_SETTINGS.ai, model: 'reader-model' },
+      preferences: {
+        ...DEFAULT_SETTINGS.ai,
+        model: 'reader-model',
+        summaryLanguage: 'zh-CN',
+        customInstructions: 'Prioritize evidence',
+      },
       sourceFingerprint: 'fingerprint',
     });
 
     const synthesisMessages = client.complete.mock.calls[1][0];
+    expect(synthesisMessages[0].content).toContain('Simplified Chinese');
+    expect(synthesisMessages[0].content).toContain('220 words');
     const synthesisInput = JSON.parse(synthesisMessages[1].content);
+    expect(synthesisInput.readerPreference).toBe('Prioritize evidence');
     expect(synthesisInput.entries).toEqual([{
       articleId: 'a1',
       brief: 'Generated brief',

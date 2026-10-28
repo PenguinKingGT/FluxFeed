@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createArticleFingerprint, generateArticleSummary } from '@/lib/ai';
-import { countUnicodeCharacters, sanitizeAiPreferences } from '@/lib/ai/ai-preferences';
-import { AiRequestError, type AiMessage } from '@/lib/ai/ai-client';
+import { countUnicodeCharacters, isAiConfigured, sanitizeAiPreferences } from '@/lib/ai/ai-preferences';
+import { AiRequestError } from '@/lib/ai/ai-errors';
+import type { AiMessage } from '@/lib/ai/completion';
 import { ARTICLE_CHUNK_CHARACTERS, ARTICLE_MAX_CHARACTERS, planArticleSummary } from '@/lib/ai/article-chunker';
 import { DEFAULT_SETTINGS } from '@/lib/db';
 
@@ -134,6 +135,22 @@ describe('AI article summary', () => {
       'A'.repeat(ARTICLE_CHUNK_CHARACTERS + 1), DEFAULT_SETTINGS.ai, 'fingerprint',
     )).rejects.toMatchObject({ code: 'AI_RESPONSE_INVALID' });
     expect(complete).toHaveBeenCalledTimes(2);
+  });
+
+
+  it('normalizes old settings and accepts native defaults without a URL override', async () => {
+    const { provider: _provider, ...legacy } = DEFAULT_SETTINGS.ai;
+    expect(sanitizeAiPreferences(legacy).provider).toBe('openai-compatible');
+    expect(isAiConfigured({ ...legacy, apiUrl: '', model: 'x' })).toBe(false);
+    expect(isAiConfigured({ ...legacy, provider: 'google', apiUrl: '', model: 'x' })).toBe(true);
+    expect(isAiConfigured({ ...legacy, provider: 'anthropic', apiUrl: '', model: 'x' })).toBe(true);
+    const article = { id: 'a1', title: 'Article' };
+    const preferences = { ...legacy, apiUrl: '', model: 'same-model' };
+    expect(await createArticleFingerprint(article, 'Source text', {
+      ...preferences, provider: 'google',
+    })).not.toBe(await createArticleFingerprint(article, 'Source text', {
+      ...preferences, provider: 'anthropic',
+    }));
   });
 
 });

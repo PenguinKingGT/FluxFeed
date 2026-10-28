@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { createAiSecretStorage, createOpenAiCompatibleClient } from '@/lib/ai';
+import { createAiModule, createAiSecretStorage, createAiCompletionClient } from '@/lib/ai';
 import type { BackgroundMessage, Feed, Message } from '@/lib/types';
 import { createStorageService, db, ensureDatabaseDefaults } from '@/lib/db';
 import { fetchFeed } from '@/lib/feed';
@@ -16,7 +16,16 @@ export default defineBackground(() => {
   const refreshOneFeed = (feed: Feed) => refreshSingleFeed(feed, refreshDependencies);
   const refreshFeeds = () => refreshAllFeeds(refreshDependencies);
   const registerAlarm = (intervalMinutes: number) => registerRefreshAlarm(browser, intervalMinutes);
-  const aiSecretStorage = createAiSecretStorage(browser.storage.local);
+  const ai = createAiModule({
+    storageService,
+    aiSecretStorage: createAiSecretStorage(browser.storage.local),
+    createAiClient: (settings, apiKey) => createAiCompletionClient({
+      provider: settings.provider,
+      apiUrl: settings.apiUrl,
+      model: settings.model,
+      apiKey,
+    }),
+  });
 
   browser.runtime.onInstalled.addListener((details) => {
     void handleInstall(details, {
@@ -47,12 +56,7 @@ export default defineBackground(() => {
       registerRefreshAlarm: registerAlarm,
       sessionStorage: browser.storage.session,
       senderTabId: _sender.tab?.id,
-      aiSecretStorage,
-      createAiClient: (settings, apiKey) => createOpenAiCompatibleClient({
-        apiUrl: settings.apiUrl,
-        model: settings.model,
-        apiKey,
-      }),
+      ai,
     }).then(sendResponse);
 
     return true;

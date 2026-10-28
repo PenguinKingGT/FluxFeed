@@ -1,8 +1,5 @@
-import { ARTICLE_MAX_CHARACTERS } from '@/lib/ai/article-chunker';
 import { describe, expect, it, vi } from 'vitest';
 import type { Feed } from '@/lib/types';
-import { DEFAULT_SETTINGS } from '@/lib/db';
-import { AiRequestError } from '@/lib/ai';
 import { handleBackgroundMessage } from '@/entrypoints/background/message-handler';
 
 function createStorageService() {
@@ -197,101 +194,7 @@ describe('background message handler', () => {
     });
   });
 
-  it('generates and saves a manual article summary through injected AI dependencies', async () => {
-    const storageService = createStorageService();
-    storageService.getArticle.mockResolvedValue({
-      id: 'a1',
-      title: 'Article',
-      author: 'Author',
-    });
-    storageService.getSettings.mockResolvedValue({
-      ...DEFAULT_SETTINGS,
-      ai: {
-        ...DEFAULT_SETTINGS.ai,
-        apiUrl: 'https://ai.example/chat',
-        model: 'reader-model',
-      },
-    });
-    const complete = vi.fn().mockResolvedValue('{"overview":"Summary","keyPoints":["Point"]}');
 
-    const response = await handleBackgroundMessage(
-      {
-        action: 'ARTICLE_SUMMARIZE',
-        payload: {
-          articleId: 'a1',
-          contentText: 'A'.repeat(100),
-          trigger: 'manual',
-        },
-      },
-      {
-        storageService,
-        fetchFeed: vi.fn(),
-        updateBadge: vi.fn(),
-        refreshSingleFeed: vi.fn(),
-        refreshAllFeeds: vi.fn(),
-        aiSecretStorage: {
-          hasApiKey: vi.fn(),
-          getApiKey: vi.fn().mockResolvedValue('key'),
-          setApiKey: vi.fn(),
-          clearApiKey: vi.fn(),
-        },
-        createAiClient: vi.fn(() => ({ complete })),
-        now: () => 100,
-      },
-    );
-
-    expect(response.success).toBe(true);
-    expect(storageService.updateArticle).toHaveBeenCalledWith(
-      'a1',
-      expect.objectContaining({
-        aiSummary: expect.objectContaining({ overview: 'Summary', model: 'reader-model' }),
-      }),
-    );
-  });
-
-  it('enforces the automatic summary character threshold in the background', async () => {
-    const storageService = createStorageService();
-    storageService.getArticle.mockResolvedValue({ id: 'a1', title: 'Article' });
-    storageService.getSettings.mockResolvedValue({
-      ...DEFAULT_SETTINGS,
-      ai: {
-        ...DEFAULT_SETTINGS.ai,
-        apiUrl: 'https://ai.example/chat',
-        model: 'reader-model',
-        autoSummarizeOnOpen: true,
-        autoSummarizeMinCharacters: 500,
-      },
-    });
-    const createAiClient = vi.fn();
-
-    const response = await handleBackgroundMessage(
-      {
-        action: 'ARTICLE_SUMMARIZE',
-        payload: {
-          articleId: 'a1',
-          contentText: 'A'.repeat(100),
-          trigger: 'auto',
-        },
-      },
-      {
-        storageService,
-        fetchFeed: vi.fn(),
-        updateBadge: vi.fn(),
-        refreshSingleFeed: vi.fn(),
-        refreshAllFeeds: vi.fn(),
-        aiSecretStorage: {
-          hasApiKey: vi.fn(),
-          getApiKey: vi.fn(),
-          setApiKey: vi.fn(),
-          clearApiKey: vi.fn(),
-        },
-        createAiClient,
-      },
-    );
-
-    expect(response).toEqual({ success: false, error: 'AI_AUTO_SUMMARY_BELOW_THRESHOLD' });
-    expect(createAiClient).not.toHaveBeenCalled();
-  });
 
   it('deletes a feed and updates the badge', async () => {
     const storageService = createStorageService();
@@ -392,209 +295,10 @@ describe('background message handler', () => {
     expect(unstarred).toEqual({ success: true });
   });
 
-  it('reads a cached daily digest and rejects an invalid day range', async () => {
-    const storageService = createStorageService();
-    const digest = { id: '2026-07-28:Asia%2FShanghai:all', overview: 'Overview' };
-    storageService.getDailyDigest.mockResolvedValue(digest);
-    const dependencies = {
-      storageService,
-      fetchFeed: vi.fn(),
-      updateBadge: vi.fn(),
-      refreshSingleFeed: vi.fn(),
-      refreshAllFeeds: vi.fn(),
-    };
-    const validPayload = {
-      dayKey: '2026-07-28',
-      timeZone: 'Asia/Shanghai',
-      scope: 'all' as const,
-      startAt: 1000,
-      endAt: 2000,
-    };
 
-    const valid = await handleBackgroundMessage(
-      { action: 'DAILY_DIGEST_GET', payload: validPayload },
-      dependencies,
-    );
-    const invalid = await handleBackgroundMessage(
-      {
-        action: 'DAILY_DIGEST_GET',
-        payload: { ...validPayload, dayKey: '07/28/2026', endAt: validPayload.startAt },
-      },
-      dependencies,
-    );
 
-    expect(valid).toEqual({ success: true, data: { digest } });
-    expect(storageService.getDailyDigest).toHaveBeenCalledWith(
-      '2026-07-28:Asia%2FShanghai:all',
-    );
-    expect(invalid).toEqual({ success: false, error: 'DAILY_DIGEST_INVALID_DATE' });
-  });
 
-  it('generates and saves a daily digest through injected AI dependencies', async () => {
-    const storageService = createStorageService();
-    storageService.getSettings.mockResolvedValue({
-      ...DEFAULT_SETTINGS,
-      ai: {
-        ...DEFAULT_SETTINGS.ai,
-        apiUrl: 'https://ai.example/chat',
-        model: 'reader-model',
-      },
-    });
-    storageService.getArticles.mockResolvedValue([{
-      id: 'a1',
-      feedId: 'feed-1',
-      title: 'Article',
-      author: 'Author',
-      publishedAt: 1500,
-      summary: 'Fallback summary',
-      isRead: false,
-    }]);
-    storageService.getFeeds.mockResolvedValue([{ id: 'feed-1', title: 'Feed' }]);
-    storageService.getDailyDigest.mockResolvedValue(undefined);
-    const complete = vi.fn()
-      .mockResolvedValueOnce(JSON.stringify({
-        entries: [{
-          articleId: 'a1',
-          brief: 'Generated brief',
-          whyItMatters: 'Useful',
-          topics: ['AI'],
-        }],
-        topicHints: ['AI'],
-      }))
-      .mockResolvedValueOnce(JSON.stringify({
-        overview: 'Today overview',
-        topics: [{ name: 'AI', overview: 'AI news', articleIds: ['a1'] }],
-      }));
 
-    const response = await handleBackgroundMessage(
-      {
-        action: 'DAILY_DIGEST_GENERATE',
-        payload: {
-          dayKey: '2026-07-28',
-          timeZone: 'Asia/Shanghai',
-          scope: 'all',
-          startAt: 1000,
-          endAt: 2000,
-          articleExcerpts: [{ articleId: 'a1', textExcerpt: 'Article body' }],
-        },
-      },
-      {
-        storageService,
-        fetchFeed: vi.fn(),
-        updateBadge: vi.fn(),
-        refreshSingleFeed: vi.fn(),
-        refreshAllFeeds: vi.fn(),
-        aiSecretStorage: {
-          hasApiKey: vi.fn(),
-          getApiKey: vi.fn().mockResolvedValue('key'),
-          setApiKey: vi.fn(),
-          clearApiKey: vi.fn(),
-        },
-        createAiClient: vi.fn(() => ({ complete })),
-        now: () => 3000,
-      },
-    );
-
-    expect(response.success).toBe(true);
-    expect(storageService.saveDailyDigest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: '2026-07-28:Asia%2FShanghai:all',
-        overview: 'Today overview',
-        articleIds: ['a1'],
-      }),
-    );
-  });
-
-  it('updates AI credentials without returning the secret', async () => {
-    const storageService = createStorageService();
-    const aiSecretStorage = {
-      hasApiKey: vi.fn().mockResolvedValue(true),
-      getApiKey: vi.fn(),
-      setApiKey: vi.fn(),
-      clearApiKey: vi.fn(),
-    };
-    const dependencies = {
-      storageService,
-      fetchFeed: vi.fn(),
-      updateBadge: vi.fn(),
-      refreshSingleFeed: vi.fn(),
-      refreshAllFeeds: vi.fn(),
-      aiSecretStorage,
-    };
-
-    const update = await handleBackgroundMessage(
-      { action: 'AI_CREDENTIAL_UPDATE', payload: { apiKey: 'private-key' } },
-      dependencies,
-    );
-    const status = await handleBackgroundMessage(
-      { action: 'AI_CREDENTIAL_STATUS' },
-      dependencies,
-    );
-
-    expect(aiSecretStorage.setApiKey).toHaveBeenCalledWith('private-key');
-    expect(update).toEqual({ success: true, data: { hasApiKey: true } });
-    expect(status).toEqual({ success: true, data: { hasApiKey: true } });
-    expect(JSON.stringify([update, status])).not.toContain('private-key');
-  });
-
-  it('rejects oversized AI credentials', async () => {
-    const storageService = createStorageService();
-    const setApiKey = vi.fn();
-
-    const response = await handleBackgroundMessage(
-      { action: 'AI_CREDENTIAL_UPDATE', payload: { apiKey: 'x'.repeat(10001) } },
-      {
-        storageService,
-        fetchFeed: vi.fn(),
-        updateBadge: vi.fn(),
-        refreshSingleFeed: vi.fn(),
-        refreshAllFeeds: vi.fn(),
-        aiSecretStorage: {
-          hasApiKey: vi.fn(),
-          getApiKey: vi.fn(),
-          setApiKey,
-          clearApiKey: vi.fn(),
-        },
-      },
-    );
-
-    expect(response).toEqual({ success: false, error: 'AI_REQUEST_INVALID' });
-    expect(setApiKey).not.toHaveBeenCalled();
-  });
-
-  it('maps AI connection failures to their public error code', async () => {
-    const storageService = createStorageService();
-    storageService.getSettings.mockResolvedValue({
-      ...DEFAULT_SETTINGS,
-      ai: {
-        ...DEFAULT_SETTINGS.ai,
-        apiUrl: 'https://ai.example/chat',
-        model: 'reader-model',
-      },
-    });
-
-    const response = await handleBackgroundMessage(
-      { action: 'AI_CONNECTION_TEST' },
-      {
-        storageService,
-        fetchFeed: vi.fn(),
-        updateBadge: vi.fn(),
-        refreshSingleFeed: vi.fn(),
-        refreshAllFeeds: vi.fn(),
-        aiSecretStorage: {
-          hasApiKey: vi.fn(),
-          getApiKey: vi.fn().mockResolvedValue('key'),
-          setApiKey: vi.fn(),
-          clearApiKey: vi.fn(),
-        },
-        createAiClient: vi.fn(() => ({
-          complete: vi.fn().mockRejectedValue(new AiRequestError('AI_TIMEOUT')),
-        })),
-      },
-    );
-
-    expect(response).toEqual({ success: false, error: 'AI_TIMEOUT' });
-  });
 
   it('converts unexpected background dependency rejection into a failure response', async () => {
     const storageService = createStorageService();
@@ -616,94 +320,23 @@ describe('background message handler', () => {
 });
 
 
-/** Supplies the real handler with observable storage and deterministic AI responses. */
-function summaryDependencies() {
-  const storageService = createStorageService();
-  const oldSummary = { overview: 'Old summary' };
-  storageService.getArticle.mockResolvedValue({
-    id: 'a1', title: 'Article', author: '', aiSummary: oldSummary,
-  });
-  storageService.getSettings.mockResolvedValue({
-    ...DEFAULT_SETTINGS,
-    ai: {
-      ...DEFAULT_SETTINGS.ai,
-      apiUrl: 'https://example.com/v1', model: 'model', autoSummarizeOnOpen: true,
-    },
-  });
-  const complete = vi.fn().mockResolvedValue('{"overview":"New summary","keyPoints":[]}');
-  return {
-    storageService,
-    complete,
-    fetchFeed: vi.fn(), updateBadge: vi.fn(),
-    refreshSingleFeed: vi.fn(), refreshAllFeeds: vi.fn(),
-    aiSecretStorage: {
-      hasApiKey: vi.fn(), getApiKey: vi.fn().mockResolvedValue(''),
-      setApiKey: vi.fn(), clearApiKey: vi.fn(),
-    },
-    createAiClient: vi.fn(() => ({ complete })),
-  };
-}
-
-describe('background long article summaries', () => {
+describe('AI operation routing', () => {
   it.each([
-    { trigger: 'manual', allowPartial: false },
-    { trigger: 'auto', allowPartial: true },
-  ])('rejects partial processing without manual consent: $trigger', async (options) => {
-    const dependencies = summaryDependencies();
-    const response = await handleBackgroundMessage({
-      action: 'ARTICLE_SUMMARIZE',
-      payload: { articleId: 'a1', contentText: 'A'.repeat(ARTICLE_MAX_CHARACTERS + 1), ...options },
-    }, dependencies);
-    expect(response).toEqual({ success: false, error: 'AI_PARTIAL_CONFIRMATION_REQUIRED' });
-    expect(dependencies.createAiClient).not.toHaveBeenCalled();
-    expect(dependencies.storageService.updateArticle).not.toHaveBeenCalled();
-  });
-
-  it('summarizes more than 30,000 characters and saves only after synthesis', async () => {
-    const dependencies = summaryDependencies();
-    const response = await handleBackgroundMessage({
-      action: 'ARTICLE_SUMMARIZE',
-      payload: { articleId: 'a1', contentText: 'A'.repeat(31000), trigger: 'manual' },
-    }, dependencies);
-    expect(response.success).toBe(true);
-    expect(dependencies.complete).toHaveBeenCalledTimes(3);
-    expect(dependencies.storageService.updateArticle).toHaveBeenCalledOnce();
-    expect(dependencies.storageService.updateArticle).toHaveBeenCalledWith('a1', {
-      aiSummary: expect.objectContaining({ isPartial: false, chunkCount: 2 }),
+    'ARTICLE_SUMMARIZE', 'DAILY_DIGEST_GET', 'DAILY_DIGEST_GENERATE',
+    'AI_CREDENTIAL_STATUS', 'AI_CREDENTIAL_UPDATE', 'AI_CONNECTION_TEST',
+  ] as const)('delegates %s without interpreting AI inputs', async (action) => {
+    const payload = { opaque: true };
+    const result = { success: true, data: { cached: true } };
+    const execute = vi.fn().mockResolvedValue(result);
+    const response = await handleBackgroundMessage({ action, payload }, {
+      storageService: createStorageService(),
+      fetchFeed: vi.fn(),
+      updateBadge: vi.fn(),
+      refreshSingleFeed: vi.fn(),
+      refreshAllFeeds: vi.fn(),
+      ai: { execute },
     });
-  });
-
-  it('saves explicit partial scope with at most six requests', async () => {
-    const dependencies = summaryDependencies();
-    const response = await handleBackgroundMessage({
-      action: 'ARTICLE_SUMMARIZE',
-      payload: {
-        articleId: 'a1', contentText: 'A'.repeat(ARTICLE_MAX_CHARACTERS + 1),
-        trigger: 'manual', allowPartial: true,
-      },
-    }, dependencies);
-    expect(response.success).toBe(true);
-    expect(dependencies.complete).toHaveBeenCalledTimes(6);
-    expect(dependencies.storageService.updateArticle).toHaveBeenCalledWith('a1', {
-      aiSummary: expect.objectContaining({ isPartial: true, chunkCount: 5 }),
-    });
-  });
-
-  it.each(['chunk', 'synthesis'])('preserves old cache when %s fails', async (phase) => {
-    const dependencies = summaryDependencies();
-    if (phase === 'chunk') {
-      dependencies.complete.mockRejectedValueOnce(new AiRequestError('AI_TIMEOUT'));
-    } else {
-      dependencies.complete
-        .mockResolvedValueOnce('{"overview":"Section one","keyPoints":[]}')
-        .mockResolvedValueOnce('{"overview":"Section two","keyPoints":[]}')
-        .mockRejectedValueOnce(new AiRequestError('AI_TIMEOUT'));
-    }
-    const response = await handleBackgroundMessage({
-      action: 'ARTICLE_SUMMARIZE',
-      payload: { articleId: 'a1', contentText: 'A'.repeat(31000), trigger: 'manual', force: true },
-    }, dependencies);
-    expect(response).toEqual({ success: false, error: 'AI_TIMEOUT' });
-    expect(dependencies.storageService.updateArticle).not.toHaveBeenCalled();
+    expect(execute).toHaveBeenCalledWith({ action, payload });
+    expect(response).toEqual(result);
   });
 });

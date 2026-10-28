@@ -1,4 +1,4 @@
-import { AiRequestError } from './ai-client';
+import { AiRequestError } from './ai-errors';
 import { z } from 'zod';
 
 export const articleSummarySchema = z.object({

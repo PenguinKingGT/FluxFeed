@@ -15,7 +15,7 @@
 
 FluxFeed 把 RSS、Atom 和 JSON Feed 阅读整理成一个专注的浏览器工作区。订阅、文章、目录、偏好设置和已缓存的摘要都保存在浏览器本地，不需要 FluxFeed 账号，也没有官方托管的同步服务。
 
-AI 完全可选。启用后，FluxFeed 会直接连接你配置的 OpenAI-compatible 服务。API 地址、模型、API Key 以及何时总结内容都由你控制。
+AI 完全可选。启用后，FluxFeed 会直接连接你配置的 OpenAI-compatible 服务、Gemini 或 Claude。API 地址、模型、API Key 以及何时总结内容都由你控制。
 
 ## 功能
 
@@ -84,15 +84,17 @@ Firefox 临时扩展会在浏览器关闭后被移除。
 
 ## 配置 AI 摘要
 
-在提供兼容服务前，AI 功能不会启用：
+使用 AI 功能前，请先配置供应商：
 
 1. 打开**设置 → AI 总结**。
-2. 输入以 `/v1` 结尾的 OpenAI-compatible 基础地址，或完整的 Chat Completions 地址。
+2. 选择 **OpenAI-compatible**、**Gemini** 或 **Claude**。兼容服务可填写 `/v1` 基础地址或完整 Chat Completions 地址；Gemini 和 Claude 使用原生协议，提供官方默认基础地址，也可填写代理基础地址。
 3. 输入该服务接受的模型名称。
-4. 根据需要保存 API Key，并点击**测试连接**。
+4. 保存对应供应商的 API Key，并点击**测试连接**。兼容本地服务可不填写 Key，原生 Gemini 和 Claude 必须填写。
 5. 选择摘要语言、摘要长度、简报文章上限，以及是否自动总结长文章。
 
-FluxFeed 当前只支持 OpenAI-compatible Chat Completions 协议，暂不支持 Anthropic 或 Gemini 原生协议、自定义请求头、流式输出和对话追问。
+FluxFeed 支持 OpenAI-compatible Chat Completions、原生 Gemini 和原生 Claude Messages，暂不支持自定义请求头、流式输出和对话追问。切换供应商会重置地址和模型；API Key 按供应商独立保存，旧兼容配置和 Key 继续可用。
+
+FluxFeed 在扩展后台通过 Vercel AI SDK 直接请求所选供应商，不需要 Vercel 账号或 AI Gateway。SDK 自动重试和 telemetry 均已关闭。
 
 ### 请求规则
 
@@ -106,7 +108,7 @@ FluxFeed 当前只支持 OpenAI-compatible Chat Completions 协议，暂不支�
 ## 隐私与权限
 
 - 订阅、文章、目录、设置和生成的摘要保存在本地 IndexedDB。
-- 可选的 AI API Key 单独保存在 `browser.storage.local`，不会写入 OPML，也不会返回页面状态。
+- AI API Key 按供应商独立保存在 `browser.storage.local`，不会写入 OPML，也不会返回页面状态。
 - AI 请求只由扩展后台进程发送到你配置的服务。
 - 只有在你手动请求总结或开启自动总结后，文章摘录才会离开浏览器。
 - FluxFeed 不包含数据分析服务，也没有官方托管账号。

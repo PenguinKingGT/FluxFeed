@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AiRequestError, createOpenAiCompatibleClient } from '@/lib/ai';
+import { AiRequestError, createAiCompletionClient } from '@/lib/ai';
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status });
@@ -14,7 +14,7 @@ describe('OpenAI-compatible client', () => {
     const fetchImpl = vi.fn().mockResolvedValue(response({
       choices: [{ message: { content: '{"overview":"Done","keyPoints":[]}' } }],
     }));
-    const client = createOpenAiCompatibleClient({
+    const client = createAiCompletionClient({
       apiUrl: 'https://ai.example/v1/chat/completions',
       model: 'reader-model',
       apiKey: 'secret',
@@ -22,20 +22,27 @@ describe('OpenAI-compatible client', () => {
     });
 
     await expect(client.complete(
-      [{ role: 'user', content: 'Hello' }],
+      [
+        { role: 'system', content: 'Summarize only the supplied source.' },
+        { role: 'user', content: 'Hello' },
+      ],
       { maxTokens: 1200 },
     )).resolves.toContain('Done');
     expect(fetchImpl).toHaveBeenCalledWith(
       'https://ai.example/v1/chat/completions',
       expect.objectContaining({
         redirect: 'manual',
-        headers: expect.objectContaining({ Authorization: 'Bearer secret' }),
       }),
     );
     const options = fetchImpl.mock.calls[0][1] as RequestInit;
+    expect(new Headers(options.headers).get('authorization')).toBe('Bearer secret');
     expect(JSON.parse(String(options.body))).toMatchObject({
       model: 'reader-model',
       max_tokens: 1200,
+      messages: [
+        { role: 'system', content: 'Summarize only the supplied source.' },
+        { role: 'user', content: 'Hello' },
+      ],
     });
   });
 
@@ -43,7 +50,7 @@ describe('OpenAI-compatible client', () => {
     const fetchImpl = vi.fn().mockResolvedValue(response({
       choices: [{ message: { content: 'Done' } }],
     }));
-    const client = createOpenAiCompatibleClient({
+    const client = createAiCompletionClient({
       apiUrl: 'https://openrouter.ai/api/v1',
       model: 'reader-model',
       fetchImpl,
@@ -61,7 +68,7 @@ describe('OpenAI-compatible client', () => {
     ['file:///tmp/model', 'AI_INVALID_URL'],
     ['not-a-url', 'AI_INVALID_URL'],
   ])('rejects unsupported URL %s', (apiUrl, code) => {
-    expect(() => createOpenAiCompatibleClient({ apiUrl, model: 'x' })).toThrowError(
+    expect(() => createAiCompletionClient({ apiUrl, model: 'x' })).toThrowError(
       expect.objectContaining({ code }),
     );
   });
@@ -73,7 +80,7 @@ describe('OpenAI-compatible client', () => {
     [500, 'AI_REQUEST_FAILED'],
     [302, 'AI_REDIRECT_REJECTED'],
   ])('maps HTTP %s to %s', async (status, code) => {
-    const client = createOpenAiCompatibleClient({
+    const client = createAiCompletionClient({
       apiUrl: 'https://ai.example/chat',
       model: 'x',
       fetchImpl: vi.fn().mockResolvedValue(response({}, status)),
@@ -82,7 +89,7 @@ describe('OpenAI-compatible client', () => {
   });
 
   it('rejects a malformed completion response', async () => {
-    const client = createOpenAiCompatibleClient({
+    const client = createAiCompletionClient({
       apiUrl: 'https://ai.example/chat',
       model: 'x',
       fetchImpl: vi.fn().mockResolvedValue(response({ choices: [] })),
@@ -94,7 +101,7 @@ describe('OpenAI-compatible client', () => {
     const fetchImpl = vi.fn().mockResolvedValue(response({
       choices: [{ message: { content: 'Done' } }],
     }));
-    const client = createOpenAiCompatibleClient({
+    const client = createAiCompletionClient({
       apiUrl: 'https://ai.example/chat',
       model: 'x',
       apiKey: '   ',
@@ -104,11 +111,12 @@ describe('OpenAI-compatible client', () => {
     await client.complete([{ role: 'user', content: 'x' }]);
 
     const options = fetchImpl.mock.calls[0][1] as RequestInit;
-    expect(options.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(new Headers(options.headers).get('authorization')).toBeNull();
+    expect(new Headers(options.headers).get('content-type')).toBe('application/json');
   });
 
   it('maps a network rejection to AI_REQUEST_FAILED', async () => {
-    const client = createOpenAiCompatibleClient({
+    const client = createAiCompletionClient({
       apiUrl: 'https://ai.example/chat',
       model: 'x',
       fetchImpl: vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
@@ -128,7 +136,7 @@ describe('OpenAI-compatible client', () => {
         });
       })
     ));
-    const client = createOpenAiCompatibleClient({
+    const client = createAiCompletionClient({
       apiUrl: 'https://ai.example/chat',
       model: 'x',
       timeoutMs: 25,
@@ -144,15 +152,14 @@ describe('OpenAI-compatible client', () => {
 
   it('maps an abort while reading the response body to AI_TIMEOUT', async () => {
     const abortError = new DOMException('Aborted', 'AbortError');
-    const client = createOpenAiCompatibleClient({
+    const client = createAiCompletionClient({
       apiUrl: 'https://ai.example/chat',
       model: 'x',
-      fetchImpl: vi.fn().mockResolvedValue({
-        type: 'basic',
-        status: 200,
-        ok: true,
-        text: vi.fn().mockRejectedValue(abortError),
-      } as unknown as Response),
+      fetchImpl: vi.fn().mockResolvedValue(new Response(new ReadableStream({
+        start(controller) {
+          controller.error(abortError);
+        },
+      }))),
     });
 
     await expect(client.complete([{ role: 'user', content: 'x' }])).rejects.toMatchObject({
@@ -161,7 +168,7 @@ describe('OpenAI-compatible client', () => {
   });
 
   it('rejects an opaque redirect response', async () => {
-    const client = createOpenAiCompatibleClient({
+    const client = createAiCompletionClient({
       apiUrl: 'https://ai.example/chat',
       model: 'x',
       fetchImpl: vi.fn().mockResolvedValue({
@@ -178,7 +185,7 @@ describe('OpenAI-compatible client', () => {
 
   it('rejects a response body larger than one MiB', async () => {
     const oversizedContent = 'x'.repeat(1024 * 1024);
-    const client = createOpenAiCompatibleClient({
+    const client = createAiCompletionClient({
       apiUrl: 'https://ai.example/chat',
       model: 'x',
       fetchImpl: vi.fn().mockResolvedValue(response({
@@ -190,4 +197,41 @@ describe('OpenAI-compatible client', () => {
       code: 'AI_RESPONSE_INVALID',
     });
   });
+
+  it.each([429, 500])('never retries HTTP %s behind the request budget', async (status) => {
+    const fetchImpl = vi.fn().mockResolvedValue(response({}, status));
+    const client = createAiCompletionClient({ apiUrl: 'https://example.com/v1', model: 'x', fetchImpl });
+    await expect(client.complete([{ role: 'user', content: 'Hello' }])).rejects.toBeInstanceOf(AiRequestError);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it('preserves a custom full endpoint and query parameters', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(response({
+      choices: [{ message: { content: 'Done' } }],
+    }));
+    const apiUrl = 'https://example.com/custom/generate?version=2';
+    const client = createAiCompletionClient({ apiUrl, model: 'x', fetchImpl });
+    await client.complete([{ role: 'user', content: 'Hello' }]);
+    expect(fetchImpl).toHaveBeenCalledWith(apiUrl, expect.any(Object));
+  });
+
+  it('cancels an oversized streaming body before reading further chunks', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(1024 * 1024 + 1));
+      },
+      cancel,
+    });
+    const client = createAiCompletionClient({
+      apiUrl: 'https://example.com/v1',
+      model: 'x',
+      fetchImpl: vi.fn().mockResolvedValue(new Response(body)),
+    });
+    await expect(client.complete([{ role: 'user', content: 'Hello' }])).rejects.toMatchObject({
+      code: 'AI_RESPONSE_INVALID',
+    });
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
 });

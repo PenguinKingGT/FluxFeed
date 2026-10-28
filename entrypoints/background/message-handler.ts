@@ -1,18 +1,6 @@
-import { ARTICLE_MAX_CHARACTERS, planArticleSummary } from '@/lib/ai/article-chunker';
 import type { StorageService } from '@/lib/db';
-import {
-  createArticleFingerprint,
-  createDailyDigestFingerprint,
-  createDailyDigestId,
-  generateArticleSummary,
-  generateDailyDigest,
-  getDailyDigestStats,
-  type AiCompletionClient,
-  type AiSecretStorage,
-  type DigestArticleInput,
-} from '@/lib/ai';
-import { AiRequestError } from '@/lib/ai/ai-client';
-import { countUnicodeCharacters, isAiConfigured, sanitizeAiPreferences } from '@/lib/ai/ai-preferences';
+import type { AiModule } from '@/lib/ai/ai-module';
+import { sanitizeAiPreferences } from '@/lib/ai/ai-preferences';
 import type { FetchFeedResult } from '@/lib/feed';
 import { createRecordId } from '@/lib/id';
 import type {
@@ -45,9 +33,6 @@ interface MessageHandlerDependencies {
     | 'updateArticle'
     | 'getSettings'
     | 'saveSettings'
-    | 'getArticle'
-    | 'getDailyDigest'
-    | 'saveDailyDigest'
   >;
   fetchFeed(url: string): Promise<FetchFeedResult>;
   updateBadge(): Promise<void>;
@@ -60,8 +45,7 @@ interface MessageHandlerDependencies {
   };
   senderTabId?: number;
   now?: () => number;
-  aiSecretStorage?: AiSecretStorage;
-  createAiClient?: (settings: Settings['ai'], apiKey: string) => AiCompletionClient;
+  ai?: AiModule;
 }
 
 interface FeedAddPayload {
@@ -94,41 +78,6 @@ interface ArticleStarPayload {
 interface NormalizedMessage {
   action: MessageAction;
   payload?: unknown;
-}
-
-interface ArticleSummarizePayload {
-  articleId: string;
-  contentText: string;
-  force?: boolean;
-  allowPartial?: boolean;
-  trigger: 'manual' | 'auto';
-}
-
-interface DailyDigestPayload {
-  dayKey: string;
-  timeZone: string;
-  scope: 'all' | 'unread';
-  startAt: number;
-  endAt: number;
-  articleExcerpts?: Array<{ articleId: string; textExcerpt: string }>;
-  force?: boolean;
-}
-
-function aiFailure(error: unknown): MessageResponse {
-  if (error instanceof AiRequestError) {
-    return { success: false, error: error.code };
-  }
-  return { success: false, error: 'AI_REQUEST_FAILED' };
-}
-
-function validateDigestPayload(payload: DailyDigestPayload): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(payload.dayKey)
-    && Boolean(payload.timeZone)
-    && ['all', 'unread'].includes(payload.scope)
-    && Number.isFinite(payload.startAt)
-    && Number.isFinite(payload.endAt)
-    && payload.endAt > payload.startAt
-    && payload.endAt - payload.startAt <= 26 * 60 * 60 * 1000;
 }
 
 function normalizeMessage(message: Message | BackgroundMessage): NormalizedMessage {
@@ -353,158 +302,16 @@ export async function handleBackgroundMessage(
         return { success: true };
       }
 
-      case 'ARTICLE_SUMMARIZE': {
-        if (!dependencies.aiSecretStorage || !dependencies.createAiClient) {
+      case 'ARTICLE_SUMMARIZE':
+      case 'DAILY_DIGEST_GET':
+      case 'DAILY_DIGEST_GENERATE':
+      case 'AI_CREDENTIAL_STATUS':
+      case 'AI_CREDENTIAL_UPDATE':
+      case 'AI_CONNECTION_TEST': {
+        if (!dependencies.ai) {
           return { success: false, error: 'AI_NOT_AVAILABLE' };
         }
-        const payload = message.payload as ArticleSummarizePayload;
-        if (
-          !payload?.articleId
-          || typeof payload.contentText !== 'string'
-          || payload.contentText.length > ARTICLE_MAX_CHARACTERS + 1
-          || !['manual', 'auto'].includes(payload.trigger)
-        ) {
-          return { success: false, error: 'AI_REQUEST_INVALID' };
-        }
-        const article = await dependencies.storageService.getArticle(payload.articleId);
-        if (!article) return { success: false, error: 'ARTICLE_NOT_FOUND' };
-
-        const plan = planArticleSummary(payload.contentText);
-        if (plan.isPartial && (payload.trigger === 'auto' || payload.allowPartial !== true)) {
-          return { success: false, error: 'AI_PARTIAL_CONFIRMATION_REQUIRED' };
-        }
-
-        const characterCount = countUnicodeCharacters(payload.contentText);
-        if (characterCount < 80) {
-          return { success: false, error: 'ARTICLE_CONTENT_TOO_SHORT' };
-        }
-        const settings = await dependencies.storageService.getSettings();
-        const ai = sanitizeAiPreferences(settings.ai);
-        if (!isAiConfigured(ai)) return { success: false, error: 'AI_NOT_CONFIGURED' };
-        if (payload.trigger === 'auto') {
-          if (!ai.autoSummarizeOnOpen) {
-            return { success: false, error: 'AI_AUTO_SUMMARY_DISABLED' };
-          }
-          if (ai.autoSummarizeMinCharacters > 0 && characterCount < ai.autoSummarizeMinCharacters) {
-            return { success: false, error: 'AI_AUTO_SUMMARY_BELOW_THRESHOLD' };
-          }
-          if (article.aiSummary) {
-            return { success: true, data: { summary: article.aiSummary, cached: true, stale: true } };
-          }
-        }
-
-        const fingerprint = await createArticleFingerprint(article, payload.contentText, ai);
-        if (!payload.force && article.aiSummary?.sourceFingerprint === fingerprint) {
-          return { success: true, data: { summary: article.aiSummary, cached: true, stale: false } };
-        }
-
-        try {
-          const apiKey = await dependencies.aiSecretStorage.getApiKey();
-          const client = dependencies.createAiClient(ai, apiKey);
-          const summary = await generateArticleSummary(
-            client,
-            article,
-            payload.contentText,
-            ai,
-            fingerprint,
-            dependencies.now,
-          );
-          await dependencies.storageService.updateArticle(article.id, { aiSummary: summary });
-          return { success: true, data: { summary, cached: false, stale: false } };
-        } catch (error) {
-          return aiFailure(error);
-        }
-      }
-
-      case 'DAILY_DIGEST_GET': {
-        const payload = message.payload as DailyDigestPayload;
-        if (!validateDigestPayload(payload)) {
-          return { success: false, error: 'DAILY_DIGEST_INVALID_DATE' };
-        }
-        const digest = await dependencies.storageService.getDailyDigest(
-          createDailyDigestId(payload.dayKey, payload.timeZone, payload.scope),
-        );
-        return { success: true, data: { digest: digest ?? null } };
-      }
-
-      case 'DAILY_DIGEST_GENERATE': {
-        if (!dependencies.aiSecretStorage || !dependencies.createAiClient) {
-          return { success: false, error: 'AI_NOT_AVAILABLE' };
-        }
-        const payload = message.payload as DailyDigestPayload;
-        if (!validateDigestPayload(payload) || !Array.isArray(payload.articleExcerpts)) {
-          return { success: false, error: 'DAILY_DIGEST_INVALID_DATE' };
-        }
-        const settings = await dependencies.storageService.getSettings();
-        const ai = sanitizeAiPreferences(settings.ai);
-        if (!isAiConfigured(ai)) return { success: false, error: 'AI_NOT_CONFIGURED' };
-
-        const allArticles = await dependencies.storageService.getArticles({
-          publishedAfter: payload.startAt,
-          publishedBefore: payload.endAt,
-        });
-        const scopedArticles = payload.scope === 'unread'
-          ? allArticles.filter((article) => !article.isRead)
-          : allArticles;
-        if (scopedArticles.length === 0) {
-          return { success: false, error: 'DAILY_DIGEST_EMPTY' };
-        }
-
-        const excerptById = new Map(
-          payload.articleExcerpts
-            .filter((item) => item && typeof item.articleId === 'string' && typeof item.textExcerpt === 'string')
-            .slice(0, ai.dailyDigestMaxArticles)
-            .map((item) => [item.articleId, item.textExcerpt.slice(0, 1500)]),
-        );
-        const feeds = await dependencies.storageService.getFeeds();
-        const feedById = new Map(feeds.map((feed) => [feed.id, feed]));
-        const selected = scopedArticles.slice(0, ai.dailyDigestMaxArticles);
-        const digestArticles: DigestArticleInput[] = selected.map((article) => ({
-          articleId: article.id,
-          title: article.title,
-          source: feedById.get(article.feedId)?.title ?? 'FluxFeed',
-          author: article.author,
-          publishedAt: article.publishedAt,
-          summary: '',
-          contentExcerpt: excerptById.get(article.id) ?? '',
-        }));
-        const fingerprint = await createDailyDigestFingerprint(
-          digestArticles,
-          ai,
-          payload.dayKey,
-          payload.timeZone,
-          payload.scope,
-        );
-        const id = createDailyDigestId(payload.dayKey, payload.timeZone, payload.scope);
-        const existing = await dependencies.storageService.getDailyDigest(id);
-        if (!payload.force && existing?.sourceFingerprint === fingerprint) {
-          return {
-            success: true,
-            data: {
-              digest: existing,
-              cached: true,
-              stats: getDailyDigestStats(scopedArticles.length, digestArticles),
-            },
-          };
-        }
-
-        try {
-          const apiKey = await dependencies.aiSecretStorage.getApiKey();
-          const client = dependencies.createAiClient(ai, apiKey);
-          const result = await generateDailyDigest(client, {
-            dayKey: payload.dayKey,
-            timeZone: payload.timeZone,
-            scope: payload.scope,
-            articles: digestArticles,
-            totalArticles: scopedArticles.length,
-            preferences: ai,
-            sourceFingerprint: fingerprint,
-          }, dependencies.now);
-          await dependencies.storageService.saveDailyDigest(result.digest);
-          return { success: true, data: { ...result, cached: false } };
-        } catch (error) {
-          return aiFailure(error);
-        }
+        return await dependencies.ai.execute({ action: message.action, payload: message.payload });
       }
 
       case 'GET_UNREAD_COUNT': {
@@ -529,50 +336,6 @@ export async function handleBackgroundMessage(
       case 'SETTINGS_GET': {
         const settings = await dependencies.storageService.getSettings();
         return { success: true, data: { settings } };
-      }
-
-      case 'AI_CREDENTIAL_STATUS': {
-        if (!dependencies.aiSecretStorage) {
-          return { success: false, error: 'AI_NOT_AVAILABLE' };
-        }
-        return {
-          success: true,
-          data: { hasApiKey: await dependencies.aiSecretStorage.hasApiKey() },
-        };
-      }
-
-      case 'AI_CREDENTIAL_UPDATE': {
-        if (!dependencies.aiSecretStorage) {
-          return { success: false, error: 'AI_NOT_AVAILABLE' };
-        }
-        const apiKey = (message.payload as { apiKey?: unknown } | undefined)?.apiKey;
-        if (typeof apiKey !== 'string' || apiKey.length > 10000) {
-          return { success: false, error: 'AI_REQUEST_INVALID' };
-        }
-        await dependencies.aiSecretStorage.setApiKey(apiKey);
-        return {
-          success: true,
-          data: { hasApiKey: await dependencies.aiSecretStorage.hasApiKey() },
-        };
-      }
-
-      case 'AI_CONNECTION_TEST': {
-        if (!dependencies.aiSecretStorage || !dependencies.createAiClient) {
-          return { success: false, error: 'AI_NOT_AVAILABLE' };
-        }
-        const settings = await dependencies.storageService.getSettings();
-        const ai = sanitizeAiPreferences(settings.ai);
-        if (!isAiConfigured(ai)) return { success: false, error: 'AI_NOT_CONFIGURED' };
-        try {
-          const client = dependencies.createAiClient(ai, await dependencies.aiSecretStorage.getApiKey());
-          await client.complete([
-            { role: 'system', content: 'Return only the word OK.' },
-            { role: 'user', content: 'Connection test.' },
-          ]);
-          return { success: true };
-        } catch (error) {
-          return aiFailure(error);
-        }
       }
 
       case 'PAGE_FEED_DETECTED': {

@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS: Settings = {
   markReadOnOpen: true,
   showUnreadOnly: false,
   ai: {
+    provider: 'openai-compatible',
     apiUrl: '',
     model: '',
     summaryLanguage: 'auto',

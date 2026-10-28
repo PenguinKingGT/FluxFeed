@@ -4,7 +4,11 @@ export type ColorTheme = 'quiet-signal' | 'graphite' | 'forest';
 export type AiSummaryLanguage = 'auto' | 'zh-CN' | 'en' | 'ja';
 export type AiSummaryLength = 'brief' | 'standard' | 'detailed';
 
+export type AiProvider = 'openai-compatible' | 'google' | 'anthropic';
+
 export interface AiPreferences {
+  /** Absent in legacy data, which always uses OpenAI-compatible transport. */
+  provider?: AiProvider;
   apiUrl: string;
   model: string;
   summaryLanguage: AiSummaryLanguage;

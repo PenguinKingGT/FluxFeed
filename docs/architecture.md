@@ -17,3 +17,24 @@
 6. 页面只接收清洗后的结构化摘要，不接收 API Key。
 
 AI 输出按不可信纯文本处理。任何文章 ID 导航都必须与本地输入集合核对。
+
+## AI module 与 seam
+
+- `lib/ai/ai-module.ts` 是后台 AI module 的公开 seam：`execute({ action, payload })` 接收不可信输入，返回稳定的成功结果或产品错误码。
+- 后台入口在初始化时注入持久化、专用凭据存储、completion adapter 和时钟。通用消息处理器只转交 AI 操作，不再承担分段、缓存、日期校验或凭据读取。
+- AI module 内部统一校验输入、读取当前配置、执行自动总结与部分处理规则、判断缓存，并在生成完成后持久化。任意 SDK、存储异常都在这个 seam 转为安全错误，不返回原始异常或服务响应。
+- `lib/ai/completion.ts` 是内部 seam。生产 adapter 使用 Vercel AI SDK 的 `generateText`，按供应商选择 `@ai-sdk/openai-compatible`、`@ai-sdk/google` 或 `@ai-sdk/anthropic`；测试 adapter 提供确定性的模型结果。
+- `lib/ai/ai-client.ts` 保留应用的 HTTP 安全策略：120 秒总超时、拒绝重定向、流式读取时限制响应为 1 MiB；请求序列化和协议解析交给 SDK。
+- SDK 使用显式 provider，直接请求用户保存的地址，不使用 Vercel AI Gateway；关闭 SDK 自动重试与 telemetry。一次 completion 对应一次 HTTP 尝试，避免分段请求预算被隐式重试放大。
+- 完整 endpoint 及查询参数保持兼容；以 `/v1` 结尾的基础地址追加 `/chat/completions`。空 Key 不发送 Authorization。
+- 单篇与简报的编排分别保留在 `article-summary.ts` 和 `daily-digest.ts`；共享输出偏好放在 `summary-instructions.ts`，缓存摘要算法放在 `fingerprint.ts`。SDK 类型不进入页面状态和消息结果。
+
+重构保留现有数据库结构和消息操作。AI module 的行为测试通过公开 seam 运行；另以真实 IndexedDB 和真实 SDK 配合本地响应验证缓存读写、失败保留和凭据隔离。
+
+## 原生供应商与凭据
+
+- `AiPreferences.provider` 使用 `openai-compatible`、`google` 或 `anthropic`；缺失字段保留旧兼容语义。供应商默认地址与规范化规则集中在 `provider-settings.ts`，UI 不导入 SDK。
+- Native adapter 由 SDK 构造 Gemini `generateContent` 或 Claude Messages 路径及鉴权头，继续经过同一个受限 HTTP implementation。Chrome 扩展后台调用 Claude 时明确设置直接浏览器访问头。
+- Key 仍仅存于 `browser.storage.local`。兼容模式沿用原 key，Gemini/Claude 使用独立 namespace。凭据消息携带供应商作用域，只返回 presence flag；生成任务按本次配置读取对应 Key。
+- 页面切换供应商会重置地址、模型和未保存的 Key 输入。Key 控件以供应商作为 React key，异步凭据状态不会串到另一个供应商。
+- 单篇与简报缓存指纹均包含供应商。单篇分段、费用约束和简报降级规则继续由相同 AI module 执行。

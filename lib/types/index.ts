@@ -28,6 +28,7 @@ export type {
 } from './service';
 export type {
   AiPreferences,
+  AiProvider,
   AiSummaryLanguage,
   AiSummaryLength,
   ColorTheme,

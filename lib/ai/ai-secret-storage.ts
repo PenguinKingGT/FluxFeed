@@ -1,10 +1,11 @@
+import type { AiProvider } from '@/lib/types/settings';
 const API_KEY_STORAGE_KEY = 'fluxfeed.ai.apiKey.v1';
 
 export interface AiSecretStorage {
-  hasApiKey(): Promise<boolean>;
-  getApiKey(): Promise<string>;
-  setApiKey(value: string): Promise<void>;
-  clearApiKey(): Promise<void>;
+  hasApiKey(provider?: AiProvider): Promise<boolean>;
+  getApiKey(provider?: AiProvider): Promise<string>;
+  setApiKey(value: string, provider?: AiProvider): Promise<void>;
+  clearApiKey(provider?: AiProvider): Promise<void>;
 }
 
 export interface ExtensionLocalStorage {
@@ -13,29 +14,42 @@ export interface ExtensionLocalStorage {
   remove(key: string): Promise<void>;
 }
 
+/** Preserves the original compatible key while isolating native provider credentials. */
+function storageKey(provider: AiProvider): string {
+  return provider === 'openai-compatible'
+    ? API_KEY_STORAGE_KEY
+    : `${API_KEY_STORAGE_KEY}.${provider}`;
+}
+
+/** Stores secrets by provider; no native provider falls back to the legacy key. */
 export function createAiSecretStorage(storage: ExtensionLocalStorage): AiSecretStorage {
   return {
-    async hasApiKey() {
-      return Boolean((await this.getApiKey()).trim());
+    /** Exposes presence only to callers that do not need the credential itself. */
+    async hasApiKey(provider = 'openai-compatible') {
+      return Boolean((await this.getApiKey(provider)).trim());
     },
 
-    async getApiKey() {
-      const value = (await storage.get(API_KEY_STORAGE_KEY))[API_KEY_STORAGE_KEY];
+    /** Reads only the selected provider's local credential. */
+    async getApiKey(provider = 'openai-compatible') {
+      const key = storageKey(provider);
+      const value = (await storage.get(key))[key];
       return typeof value === 'string' ? value : '';
     },
 
-    async setApiKey(value) {
+    /** Empty values remove the selected credential without affecting other providers. */
+    async setApiKey(value, provider = 'openai-compatible') {
       const trimmed = value.trim();
+      const key = storageKey(provider);
       if (!trimmed) {
-        await storage.remove(API_KEY_STORAGE_KEY);
+        await storage.remove(key);
         return;
       }
-      await storage.set({ [API_KEY_STORAGE_KEY]: trimmed });
+      await storage.set({ [key]: trimmed });
     },
 
-    async clearApiKey() {
-      await storage.remove(API_KEY_STORAGE_KEY);
+    /** Clears only the selected provider's local credential. */
+    async clearApiKey(provider = 'openai-compatible') {
+      await storage.remove(storageKey(provider));
     },
   };
 }
-

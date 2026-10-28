@@ -20,4 +20,27 @@ describe('AI secret storage', () => {
     expect(await secrets.hasApiKey()).toBe(false);
     expect(storage.remove).toHaveBeenCalled();
   });
+
+  it('preserves legacy keys and isolates native provider reads and removal', async () => {
+    const values: Record<string, unknown> = { 'fluxfeed.ai.apiKey.v1': 'legacy-key' };
+    const secrets = createAiSecretStorage({
+      get: async (key) => ({ [key]: values[key] }),
+      set: async (items) => {
+        Object.assign(values, items);
+      },
+      remove: async (key) => {
+        delete values[key];
+      },
+    });
+    expect(await secrets.getApiKey()).toBe('legacy-key');
+    expect(await secrets.hasApiKey('google')).toBe(false);
+    expect(await secrets.hasApiKey('anthropic')).toBe(false);
+    await secrets.setApiKey('google-test', 'google');
+    await secrets.setApiKey('anthropic-test', 'anthropic');
+    await secrets.clearApiKey('google');
+    expect(await secrets.getApiKey('google')).toBe('');
+    expect(await secrets.getApiKey('anthropic')).toBe('anthropic-test');
+    expect(await secrets.getApiKey('openai-compatible')).toBe('legacy-key');
+  });
+
 });

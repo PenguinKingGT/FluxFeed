@@ -2,17 +2,30 @@
 
 ## 目标
 
-FluxFeed 使用用户自备的 OpenAI-compatible 服务，将当天订阅内容整理为可快速扫描的今日简报，并为单篇文章提供手动或自动总结。用户应能先了解今天发生了什么，再选择值得阅读的文章。
+FluxFeed 使用用户自备的 OpenAI-compatible、Gemini 或 Claude 服务，将当天订阅内容整理为可快速扫描的今日简报，并为单篇文章提供手动或自动总结。用户应能先了解今天发生了什么，再选择值得阅读的文章。
 
 ## 用户能力
 
-- 在设置页配置 OpenAI-compatible 基础地址或完整的 Chat Completions API 地址、模型和可选 API Key。
+- 在设置页选择 OpenAI-compatible、Gemini 或 Claude，配置对应地址、模型和 API Key。旧配置缺少 provider 时按 OpenAI-compatible 解释。
 - 生成当天全部文章或仅未读文章的今日简报。
 - 从简报中的主题和文章摘要直接进入对应文章。
 - 在阅读页手动生成单篇摘要。
 - 可选择打开文章时自动总结，并设置最小正文字符数。
 - 查看缓存摘要并手动重新生成。
 - 未配置 AI 时可关闭阅读页的配置提示，关闭选择保存在当前浏览器中，切换文章或重新打开扩展后不再重复显示。
+
+## 实现与兼容性
+
+- 使用 Vercel AI SDK 的 `@ai-sdk/openai-compatible`、`@ai-sdk/google` 和 `@ai-sdk/anthropic`，Gemini 和 Claude 直接使用各自原生协议。
+- Gemini 默认基础地址为 `https://generativelanguage.googleapis.com/v1beta`，Claude 为 `https://api.anthropic.com/v1`；留空使用默认值，可覆盖为代理基础地址。兼容服务仍支持基础地址或完整 endpoint。
+- 切换供应商重置当前地址和模型；当前只有一套活动配置，API Key 按供应商分别保存，切换不会复用其他供应商的 Key。
+- 旧 Key 保留在原存储位置供兼容服务使用；原生供应商不回退读取旧 Key，必须保存自己的 Key。缺少原生 Key 时不发送网络请求。
+- 缓存指纹包含供应商，避免相同模型名或地址在不同协议之间误用摘要。
+- SDK 仅在后台运行，直接请求用户配置的地址，不引入 Vercel 账号、AI Gateway 或新的权限。
+- 关闭 SDK 自动重试与 telemetry，保持分段请求预算；响应在读取时限制为 1 MiB，超大响应立即停止读取。
+- 模型结果仍按现有 Zod 规则校验，不强制远端支持 JSON Schema structured outputs，以兼容只实现基础 Chat Completions 的服务。
+- 配置、输入校验、缓存、凭据和错误映射集中在 AI module；SDK 的原始错误不会返回页面。
+- 单篇及简报的最终汇总均应用语言、长度和自定义要求。
 
 ## 请求与费用边界
 
@@ -68,7 +81,6 @@ FluxFeed 使用用户自备的 OpenAI-compatible 服务，将当天订阅内容�
 - 对话追问、工具调用或跨文章检索。
 - 多套 AI 配置。
 - 自定义请求头。
-- Anthropic、Gemini 等原生协议。
 - Markdown 或 HTML 结果渲染。
 
 ## 验收命令

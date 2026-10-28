@@ -9,9 +9,52 @@ let fixtureServer: Server | undefined;
 let fixtureFeedUrl: string;
 let aiRequests = 0;
 let rejectAiRequests = false;
+let nativeRequests: Array<{ provider: string; key?: string; body: string }> = [];
 
 test.beforeAll(async () => {
   fixtureServer = createServer((request, response) => {
+    let nativeProvider: 'google' | 'anthropic' | null = null;
+    if (request.url?.startsWith('/google/models/')) {
+      nativeProvider = 'google';
+    } else if (request.url === '/anthropic/messages') {
+      nativeProvider = 'anthropic';
+    }
+    if (nativeProvider) {
+      let body = '';
+      request.on('data', (chunk) => {
+        body += chunk.toString();
+      });
+      request.on('end', () => {
+        const key = request.headers[nativeProvider === 'google' ? 'x-goog-api-key' : 'x-api-key'];
+        nativeRequests.push({
+          provider: nativeProvider,
+          key: typeof key === 'string' ? key : undefined,
+          body,
+        });
+        const text = JSON.stringify({
+          overview: `Native ${nativeProvider} summary ${nativeRequests.length}`,
+          keyPoints: ['A native protocol summary'],
+        });
+        const result = nativeProvider === 'google'
+          ? {
+            candidates: [{ content: { role: 'model', parts: [{ text }] }, finishReason: 'STOP' }],
+            usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 3, totalTokenCount: 13 },
+          }
+          : {
+            id: 'msg_local',
+            type: 'message',
+            role: 'assistant',
+            model: 'claude-sonnet-4-5',
+            content: [{ type: 'text', text }],
+            stop_reason: 'end_turn',
+            stop_sequence: null,
+            usage: { input_tokens: 10, output_tokens: 3 },
+          };
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify(result));
+      });
+      return;
+    }
     if (request.url === '/ai/chat/completions') {
       aiRequests += 1;
       request.resume();
@@ -328,3 +371,57 @@ test('summarizes a confirmed article prefix and retains the cache after AI failu
     await page.close();
   }
 });
+
+
+for (const fixture of [
+  { provider: 'google', label: 'Gemini', model: 'gemini-2.5-flash' },
+  { provider: 'anthropic', label: 'Claude', model: 'claude-sonnet-4-5' },
+]) {
+  test(`configures ${fixture.label} and generates a native long-article summary`, async () => {
+    if (!context) {
+      throw new Error('Extension browser context was not created');
+    }
+    const page = await context.newPage();
+    await page.setViewportSize({ width: 760, height: 900 });
+    await page.goto(`chrome-extension://${extensionId}/options.html#/settings?section=ai`);
+    await page.getByRole('radio', { name: fixture.label, exact: true }).click();
+    await expect(page.getByLabel('Model', { exact: true })).toHaveValue('');
+    await expect(page.getByText('No key saved', { exact: true })).toBeVisible();
+    const key = `local-${fixture.provider}-test-key`;
+    await page.getByLabel('API Key', { exact: true }).fill(key);
+    await page.getByRole('button', { name: 'Save key', exact: true }).click();
+    await expect(page.getByText('A key is saved', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('API Key', { exact: true })).toHaveValue('');
+    const origin = new URL(fixtureFeedUrl).origin;
+    await page.getByLabel('API URL').fill(`${origin}/${fixture.provider}`);
+    await page.getByLabel('Model', { exact: true }).fill(fixture.model);
+    await page.reload();
+    await expect(page.getByRole('radio', { name: fixture.label, exact: true })).toBeChecked();
+    await expect(page.getByLabel('Model', { exact: true })).toHaveValue(fixture.model);
+    await expect(page.getByText('A key is saved', { exact: true })).toBeVisible();
+    await page.screenshot({ path: `/tmp/fluxfeed-${fixture.provider}-settings.png` });
+
+    nativeRequests = [];
+    await page.getByRole('button', { name: 'Test connection', exact: true }).click();
+    await expect(page.getByText('Connection successful', { exact: true })).toBeVisible();
+    expect(nativeRequests).toHaveLength(1);
+    expect(nativeRequests[0].key).toBe(key);
+
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
+    await page.getByRole('button', { name: /Long Summary Article/ }).click();
+    nativeRequests = [];
+    await page.getByRole('button', { name: 'Regenerate', exact: true }).click();
+    await page.getByRole('button', { name: 'Summarize opening portion', exact: true }).click();
+    const overview = `Native ${fixture.provider} summary 6`;
+    await expect(page.getByText(overview, { exact: true })).toBeVisible();
+    expect(nativeRequests).toHaveLength(6);
+    expect(nativeRequests.every((item) => item.provider === fixture.provider && item.key === key)).toBe(true);
+    expect(nativeRequests[0].body).toContain('Long article evidence.');
+    await page.reload();
+    await page.getByRole('button', { name: /Long Summary Article/ }).click();
+    await expect(page.getByText(overview, { exact: true })).toBeVisible();
+    expect(nativeRequests).toHaveLength(6);
+    await page.close();
+  });
+}
