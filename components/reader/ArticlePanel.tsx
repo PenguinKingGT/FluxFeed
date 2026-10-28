@@ -28,7 +28,7 @@ export function ArticlePanel({ articles, feeds, activeArticleId, filter, isLoadi
   const parentRef = useRef<HTMLDivElement>(null);
   const pendingFocusId = useRef<string | null>(null);
   const feedById = useMemo(() => new Map(feeds.map((feed) => [feed.id, feed])), [feeds]);
-  const estimatedArticleHeight = 164;
+  const estimatedArticleHeight = 140;
   const rowVirtualizer = useVirtualizer({
     count: articles.length,
     getScrollElement: () => parentRef.current,

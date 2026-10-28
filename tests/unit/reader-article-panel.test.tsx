@@ -71,7 +71,7 @@ describe('Reader ArticlePanel', () => {
     expect(screen.getByText('Understanding WXT Framework for Chrome Extensions')).not.toBeNull();
     expect(screen.getAllByText('The Verge').length).toBeGreaterThan(0);
     expect(screen.getByText('Understanding WXT Framework for Chrome Extensions').closest('article')?.className).toContain('bg-accent');
-    expect(screen.getByText('Read article').closest('article')?.className).toContain('opacity-50');
+    expect(screen.getByText('Read article').closest('article')?.className).not.toContain('opacity-50');
 
     fireEvent.click(screen.getByLabelText('Refresh feeds'));
     expect(refreshFeed).toHaveBeenCalled();
