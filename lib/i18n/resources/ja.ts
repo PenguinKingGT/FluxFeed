@@ -2,6 +2,8 @@ import type { en } from './en';
 
 export const ja: Record<keyof typeof en, string> = {
   'app.subtitle': 'RSSリーダー',
+  'navigation.collapseSidebar': 'サイドバーを折りたたむ',
+  'navigation.expandSidebar': 'サイドバーを展開',
   'navigation.inbox': '受信トレイ',
   'navigation.starred': 'スター付き',
   'navigation.allArticles': 'すべての記事',

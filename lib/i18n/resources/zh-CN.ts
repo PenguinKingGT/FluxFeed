@@ -2,6 +2,8 @@ import type { en } from './en';
 
 export const zhCN: Record<keyof typeof en, string> = {
   'app.subtitle': 'RSS阅读器',
+  'navigation.collapseSidebar': '收起侧栏',
+  'navigation.expandSidebar': '展开侧栏',
   'navigation.inbox': '收件箱',
   'navigation.starred': '已收藏',
   'navigation.allArticles': '全部文章',

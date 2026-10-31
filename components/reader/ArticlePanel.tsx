@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Menu, RefreshCw, Search, SearchX, X } from 'lucide-react';
+import { Menu, PanelLeftClose, PanelLeftOpen, RefreshCw, Search, SearchX, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
@@ -19,9 +19,25 @@ interface ArticlePanelProps {
   refreshFeed: () => Promise<void> | void;
   setActiveArticle: (articleId: string) => void;
   onOpenNavigation: () => void;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
 }
 
-export function ArticlePanel({ articles, feeds, activeArticleId, filter, isLoading, error, setFilter, refreshFeed, setActiveArticle, onOpenNavigation }: ArticlePanelProps) {
+/** Displays searchable articles and keeps navigation controls beside the list heading. */
+export function ArticlePanel({
+  articles,
+  feeds,
+  activeArticleId,
+  filter,
+  isLoading,
+  error,
+  setFilter,
+  refreshFeed,
+  setActiveArticle,
+  onOpenNavigation,
+  isSidebarCollapsed = false,
+  onToggleSidebar,
+}: ArticlePanelProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState(filter.searchQuery ?? '');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -86,7 +102,7 @@ export function ArticlePanel({ articles, feeds, activeArticleId, filter, isLoadi
   return (
     <main data-testid="article-panel" className="reader-article-panel flex h-screen w-[340px] shrink-0 flex-col border-r border-border bg-card/95">
       <header className="sticky top-0 z-30 border-b border-border bg-card/90 px-4 pt-4 pb-3 backdrop-blur-xl">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <Button aria-label={t('navigation.openMenu')} title={t('navigation.openMenu')} className="reader-navigation-trigger -ml-2 rounded-lg text-muted-foreground" variant="ghost" size="icon-sm" onClick={onOpenNavigation}>
               <Menu />
@@ -95,9 +111,25 @@ export function ArticlePanel({ articles, feeds, activeArticleId, filter, isLoadi
               {filter.searchQuery ? t('reader.searchResults') : t('reader.articleList')}
             </h2>
           </div>
-          <span className="text-[10px] text-muted-foreground tabular-nums">
-            {t('reader.articleCount', { count: articles.length })}
-          </span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="text-[10px] text-muted-foreground tabular-nums">
+              {t('reader.articleCount', { count: articles.length })}
+            </span>
+            {onToggleSidebar ? (
+              <Button
+                aria-label={t(isSidebarCollapsed ? 'navigation.expandSidebar' : 'navigation.collapseSidebar')}
+                title={t(isSidebarCollapsed ? 'navigation.expandSidebar' : 'navigation.collapseSidebar')}
+                aria-expanded={!isSidebarCollapsed}
+                aria-controls="reader-navigation"
+                className="reader-sidebar-toggle -mr-1 text-muted-foreground/70 hover:text-foreground"
+                variant="ghost"
+                size="icon-sm"
+                onClick={onToggleSidebar}
+              >
+                {isSidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+              </Button>
+            ) : null}
+          </div>
         </div>
         <div className="flex items-center gap-2">
         <div className="group relative flex-1">

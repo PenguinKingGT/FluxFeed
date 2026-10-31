@@ -1,5 +1,7 @@
 export const en = {
   'app.subtitle': 'RSS Reader',
+  'navigation.collapseSidebar': 'Collapse sidebar',
+  'navigation.expandSidebar': 'Expand sidebar',
   'navigation.inbox': 'Inbox',
   'navigation.starred': 'Starred',
   'navigation.allArticles': 'All Articles',

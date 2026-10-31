@@ -19,6 +19,7 @@ AI is optional. If you enable it, FluxFeed connects directly to your configured 
 
 ## Features
 
+- **Collapsible navigation:** Hide or restore the desktop sidebar with a smooth transition; your choice is remembered locally.
 - **Feed subscriptions:** add feed URLs directly or subscribe to feeds discovered on the current page. The sidebar folder “+” menu adds feeds or folders in place; the bottom Add Feed button opens the feed form directly.
 - **Local library:** organize subscriptions in nested folders and move data with OPML import/export.
 - **Focused reading:** search full article content, mark items read, star stories, and switch directly to originals in a new tab. Inbox shows unread articles by default; All Articles includes read articles too.

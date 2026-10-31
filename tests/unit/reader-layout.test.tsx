@@ -125,7 +125,7 @@ describe('ReaderLayout', () => {
     expect(openArticleUrl).toHaveBeenCalledWith('https://example.com/post');
     fireEvent.keyDown(window, { key: 'f' });
     expect(screen.getByTestId('reader-layout').getAttribute('data-focus-mode')).toBe('true');
-    expect(window.localStorage.getItem('fluxfeed:reader-layout:v1')).toBe('{"focusMode":true}');
+    expect(window.localStorage.getItem('fluxfeed:reader-layout:v1')).toBe('{"focusMode":true,"sidebarCollapsed":false}');
 
     const input = screen.getByPlaceholderText('Search articles...');
     fireEvent.keyDown(input, { key: 'ArrowRight' });
@@ -203,6 +203,23 @@ describe('ReaderLayout', () => {
 
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(layout.getAttribute('data-navigation-open')).toBe('false');
+  });
+
+  it('toggles and restores the sidebar independently of focus mode', () => {
+    const reader = render(
+      <MemoryRouter><ReaderLayout view="inbox" /></MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+    expect(screen.getByTestId('reader-layout').dataset.sidebarCollapsed).toBe('true');
+    expect(screen.getByRole('button', { name: 'Expand sidebar' }).getAttribute('aria-expanded')).toBe('false');
+    fireEvent.keyDown(window, { key: 'f' });
+    reader.unmount();
+    render(<MemoryRouter><ReaderLayout view="inbox" /></MemoryRouter>);
+    expect(screen.getByTestId('reader-layout').dataset.sidebarCollapsed).toBe('true');
+    expect(screen.getByTestId('reader-layout').dataset.focusMode).toBe('true');
+    fireEvent.keyDown(window, { key: 'f' });
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }));
+    expect(screen.getByTestId('reader-layout').dataset.sidebarCollapsed).toBe('false');
   });
 
   it('restores the persisted focus preference', () => {

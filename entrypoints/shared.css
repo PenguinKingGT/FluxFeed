@@ -856,3 +856,57 @@ html[data-color-theme='white']:not(.dark) .surface-noise {
 html[data-color-theme='white']:not(.dark) .reader-sidebar {
   background-color: var(--sidebar);
 }
+
+/* Desktop tracks reclaim navigation space while the panel slides without scaling text. */
+.reader-sidebar-toggle {
+  display: none;
+}
+
+@media (min-width: 1100px) {
+  .reader-layout {
+    --reader-navigation-width: 15rem;
+    --reader-list-width: 340px;
+    display: grid;
+    grid-template-columns: var(--reader-navigation-width) var(--reader-list-width) minmax(0, 1fr);
+    transition: grid-template-columns 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .reader-layout .reader-sidebar {
+    transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease, visibility 0s;
+  }
+
+  .reader-layout[data-sidebar-collapsed='true'] {
+    grid-template-columns: 0rem var(--reader-list-width) minmax(0, 1fr);
+  }
+
+  .reader-layout[data-sidebar-collapsed='true'] .reader-sidebar {
+    transform: translateX(-100%);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease, visibility 0s 280ms;
+  }
+
+  .reader-sidebar-toggle {
+    display: inline-flex;
+  }
+
+  .reader-layout[data-focus-mode='true'][data-has-article='true'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1100px) and (max-width: 1439px) {
+  .reader-layout {
+    --reader-navigation-width: 4.5rem;
+    --reader-list-width: 20rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-layout,
+  .reader-layout .reader-sidebar,
+  .reader-article-panel {
+    transition: none;
+  }
+}

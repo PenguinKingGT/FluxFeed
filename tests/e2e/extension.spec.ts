@@ -330,6 +330,37 @@ test('adapts the reader chrome to laptop and narrow widths', async () => {
   await expect(page.getByText('Select an article')).toBeHidden();
 });
 
+test('collapses desktop navigation, restores it after reload, and preserves the narrow drawer', async () => {
+  if (!context) throw new Error('Extension browser context was not created');
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await page.goto(`chrome-extension://${extensionId}/options.html#/inbox`);
+  const sidebar = page.getByTestId('reader-sidebar');
+  const panel = page.getByTestId('article-panel');
+  await expect.poll(async () => Math.round((await panel.boundingBox())?.x ?? -1)).toBe(240);
+  await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await expect(sidebar).toBeHidden();
+  await expect.poll(async () => Math.round((await panel.boundingBox())?.x ?? -1)).toBe(0);
+  await page.reload();
+  await expect(sidebar).toBeHidden();
+  await page.screenshot({ path: 'test-results/sidebar-collapsed.png' });
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await page.getByRole('button', { name: 'Open navigation' }).click();
+  await expect.poll(async () => Math.round((await sidebar.boundingBox())?.x ?? -1)).toBe(0);
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.getByRole('button', { name: 'Expand sidebar' }).click();
+  await expect(sidebar).toBeVisible();
+  await expect.poll(async () => Math.round((await panel.boundingBox())?.x ?? -1)).toBe(72);
+  await page.screenshot({ path: 'test-results/sidebar-expanded.png' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+  await expect(sidebar).toBeHidden();
+  await page.getByRole('button', { name: 'Expand sidebar' }).click();
+  await expect(sidebar).toBeVisible();
+  await page.close();
+});
+
 test('configures AI summaries and opens the daily briefing route', async () => {
   if (!context) throw new Error('Extension browser context was not created');
   const page = await context.newPage();

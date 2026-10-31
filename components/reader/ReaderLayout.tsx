@@ -13,11 +13,13 @@ interface ReaderLayoutProps {
   view: ReaderView;
 }
 
+/** Coordinates reader navigation, local layout preferences, and reading interactions. */
 export function ReaderLayout({ view }: ReaderLayoutProps) {
   const { t } = useTranslation();
   const params = useParams();
   const [isNavigationOpen, setIsNavigationOpen] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(() => readReaderLayoutPreferences().focusMode);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readReaderLayoutPreferences().sidebarCollapsed === true);
   const articles = useArticleStore((state) => state.articles);
   const activeArticleId = useArticleStore((state) => state.activeArticleId);
   const unreadCount = useArticleStore((state) => state.unreadCount);
@@ -48,10 +50,18 @@ export function ReaderLayout({ view }: ReaderLayoutProps) {
   const settings = useSettingsStore((state) => state.settings);
   const activeArticle = articles.find((article) => article.id === activeArticleId);
 
+  /** Toggles desktop navigation independently of the responsive drawer and focus mode. */
+  function toggleSidebar() {
+    const sidebarCollapsed = !isSidebarCollapsed;
+    setIsSidebarCollapsed(sidebarCollapsed);
+    writeReaderLayoutPreferences({ ...readReaderLayoutPreferences(), sidebarCollapsed });
+  }
+
+  /** Remembers focus mode without replacing other layout preferences. */
   function toggleFocusMode() {
     setIsFocusMode((current) => {
       const focusMode = !current;
-      writeReaderLayoutPreferences({ focusMode });
+      writeReaderLayoutPreferences({ ...readReaderLayoutPreferences(), focusMode });
       return focusMode;
     });
   }
@@ -154,6 +164,7 @@ export function ReaderLayout({ view }: ReaderLayoutProps) {
       data-focus-mode={isFocusMode}
       data-has-article={Boolean(activeArticle)}
       data-navigation-open={isNavigationOpen}
+      data-sidebar-collapsed={isSidebarCollapsed}
       className="reader-layout surface-noise flex h-screen min-w-0 overflow-hidden bg-background text-foreground"
     >
       <button
@@ -186,6 +197,8 @@ export function ReaderLayout({ view }: ReaderLayoutProps) {
         refreshFeed={() => refreshFeed(view === 'feed' ? params.feedId : undefined)}
         setActiveArticle={setActiveArticle}
         onOpenNavigation={() => setIsNavigationOpen(true)}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebar={toggleSidebar}
       />
       <ReadingPane
         articles={articles}

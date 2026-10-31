@@ -2,12 +2,15 @@ const READER_LAYOUT_PREFERENCES_KEY = 'fluxfeed:reader-layout:v1';
 
 interface ReaderLayoutPreferences {
   focusMode: boolean;
+  sidebarCollapsed?: boolean;
 }
 
 const defaultPreferences: ReaderLayoutPreferences = {
   focusMode: false,
+  sidebarCollapsed: false,
 };
 
+/** Reads local layout choices while retaining compatibility with focus-only preferences. */
 export function readReaderLayoutPreferences(): ReaderLayoutPreferences {
   if (typeof window === 'undefined') return defaultPreferences;
 
@@ -18,12 +21,14 @@ export function readReaderLayoutPreferences(): ReaderLayoutPreferences {
     const parsed = JSON.parse(stored) as Partial<ReaderLayoutPreferences>;
     return {
       focusMode: parsed.focusMode === true,
+      sidebarCollapsed: parsed.sidebarCollapsed === true,
     };
   } catch {
     return defaultPreferences;
   }
 }
 
+/** Saves UI-only layout choices without involving the background runtime. */
 export function writeReaderLayoutPreferences(preferences: ReaderLayoutPreferences) {
   if (typeof window === 'undefined') return;
 

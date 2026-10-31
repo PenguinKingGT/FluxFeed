@@ -75,7 +75,7 @@ export function Sidebar({
   }
 
   return (
-    <aside data-testid="reader-sidebar" className="reader-sidebar sticky top-0 left-0 z-40 flex h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar/95 py-5 text-sidebar-foreground backdrop-blur-xl">
+    <aside id="reader-navigation" data-testid="reader-sidebar" className="reader-sidebar sticky top-0 left-0 z-40 flex h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar/95 py-5 text-sidebar-foreground backdrop-blur-xl">
       <div className="mb-7 px-4">
         <div className="reader-sidebar-brand flex items-center gap-3">
           <div className="relative">
