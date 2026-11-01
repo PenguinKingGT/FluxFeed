@@ -68,7 +68,7 @@ describe('refresh storage consistency', () => {
     }
     finishFetch(response);
 
-    expect(await refreshing).toBe(0);
+    expect(await refreshing).toEqual({ count: 0, failedCount: 0 });
     expect(await storageService.getFeed(feed.id)).toBeUndefined();
     expect(await storageService.getArticles()).toEqual([]);
     expect(await storageService.getUnreadCount()).toBe(0);
@@ -88,7 +88,7 @@ describe('refresh storage consistency', () => {
       fetchFeed: async () => response,
     });
 
-    expect(count).toBe(0);
+    expect(count).toEqual({ count: 0, failedCount: 0 });
     expect(await storageService.getArticles()).toEqual([]);
     expect(await storageService.getUnreadCount()).toBe(0);
   });
@@ -102,7 +102,7 @@ describe('refresh storage consistency', () => {
       now: () => 500,
     });
 
-    expect(count).toBe(1);
+    expect(count).toEqual({ count: 1, failedCount: 0 });
     expect(await storageService.getFeed(feed.id)).toMatchObject({
       title: 'After refresh',
       lastFetchedAt: 500,
@@ -163,7 +163,7 @@ describe('refresh storage consistency', () => {
         refreshSingleFeed(feed, dependencies(peerStorage)),
       ]);
 
-      expect(counts.sort()).toEqual([0, 1]);
+      expect(counts.map((result) => result.count).sort()).toEqual([0, 1]);
       expect(await storageService.getArticles()).toHaveLength(1);
       expect(await storageService.getUnreadCount()).toBe(1);
     } finally {
@@ -184,7 +184,7 @@ describe('refresh storage consistency', () => {
       }),
     });
 
-    expect(count).toBe(1);
+    expect(count).toEqual({ count: 1, failedCount: 0 });
     expect(await storageService.getArticles()).toMatchObject([{ title: 'Late article' }]);
     expect(await storageService.getUnreadCount()).toBe(1);
   });
@@ -200,7 +200,7 @@ describe('refresh storage consistency', () => {
     database.articles.hook('reading', readBody);
 
     try {
-      expect(await refreshSingleFeed(feed, dependencies)).toBe(0);
+      expect(await refreshSingleFeed(feed, dependencies)).toEqual({ count: 0, failedCount: 0 });
       expect(readBody).not.toHaveBeenCalled();
     } finally {
       database.articles.hook('reading').unsubscribe(readBody);
@@ -219,7 +219,7 @@ describe('refresh storage consistency', () => {
       refreshSingleFeed(otherFeed, { storageService, fetchFeed: async () => response }),
     ]);
 
-    expect(counts).toEqual([1, 1]);
+    expect(counts.map((result) => result.count)).toEqual([1, 1]);
     expect(await storageService.getArticleGuids(feed.id)).toEqual(['new-article']);
     expect(await storageService.getArticleGuids(otherFeed.id)).toEqual(['new-article']);
   });

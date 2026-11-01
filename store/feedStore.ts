@@ -10,7 +10,7 @@ interface FeedState {
   loadFeeds(): Promise<void>;
   addFeed(url: string, groupId?: string): Promise<MessageResponse>;
   removeFeed(feedId: string): Promise<MessageResponse>;
-  refreshFeed(feedId?: string): Promise<void>;
+  refreshFeed(feedId?: string): Promise<MessageResponse>;
 }
 
 export function createFeedStore(client: StoreMessageClient) {
@@ -50,13 +50,22 @@ export function createFeedStore(client: StoreMessageClient) {
       return response;
     },
 
+    /** Reloads metadata after full or partial refresh and preserves its failure for the reader. */
     async refreshFeed(feedId) {
       set({ isLoading: true, error: null });
-      const response = await client.send({ type: 'FETCH_NOW', feedId });
-      if (response.success) {
+      try {
+        const response = await client.send({ type: 'FETCH_NOW', feedId });
+        // A partial refresh may commit articles even when the final response reports failure.
         await get().loadFeeds();
-      } else {
-        set({ error: response.error ?? 'Failed to refresh feed', isLoading: false });
+        if (!response.success) {
+          set({ error: response.error ?? 'FEED_REFRESH_FAILED' });
+        }
+        return response;
+      } catch {
+        set({ error: 'FEED_REFRESH_FAILED' });
+        return { success: false, error: 'FEED_REFRESH_FAILED' };
+      } finally {
+        set({ isLoading: false });
       }
     },
   }));

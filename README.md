@@ -22,7 +22,7 @@ AI is optional. If you enable it, FluxFeed connects directly to your configured 
 - **Collapsible navigation:** Hide or restore the desktop sidebar with a smooth transition; your choice is remembered locally.
 - **Feed subscriptions:** add feed URLs directly, discover a feed from a website URL, or subscribe to feeds detected on the current page. The sidebar folder “+” menu adds feeds or folders in place; the bottom Add Feed button opens the feed form directly. Feed fetching has a 30-second deadline for the entire discovery chain, a 20 MiB response limit, and at most 5 discovery steps. Failed subscriptions can be retried.
 - **Local library:** organize subscriptions in nested folders and move data with OPML import/export.
-- **Focused reading:** search full article content, mark items read, star stories, and switch directly to originals in a new tab. Inbox shows unread articles by default; All Articles includes read articles too.
+- **Focused reading:** search full article content, mark items read, star stories, and switch directly to originals in a new tab. Inbox shows unread articles by default; All Articles includes read articles too. Refreshing immediately updates articles and unread counts, preserves your current filters, and shows errors that you can retry.
 - **Responsive layout:** full three-column reading on wide screens, compact navigation on laptops, and single-pane reading on narrow windows.
 - **Focus mode:** hide navigation and the article list when you want an uninterrupted reading surface.
 - **Optional AI summaries:** generate a summary for one article manually or automatically above a configurable length.

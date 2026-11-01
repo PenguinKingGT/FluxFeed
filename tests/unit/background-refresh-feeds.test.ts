@@ -66,7 +66,7 @@ describe('background refresh feeds', () => {
       now: () => 4000,
     });
 
-    expect(savedCount).toBe(1);
+    expect(savedCount).toEqual({ count: 1, failedCount: 0 });
     expect(fetchFeed).toHaveBeenCalledWith(feed.url);
     expect(storageService.commitFeedRefresh).toHaveBeenCalledWith('feed-1', [
       expect.objectContaining({ guid: 'old-guid' }),
@@ -97,7 +97,7 @@ describe('background refresh feeds', () => {
 
     const savedCount = await refreshSingleFeed(feed, { storageService, fetchFeed });
 
-    expect(savedCount).toBe(0);
+    expect(savedCount).toEqual({ count: 0, failedCount: 1 });
     expect(storageService.commitFeedRefresh).not.toHaveBeenCalled();
     expect(storageService.updateFeed).toHaveBeenCalledWith('feed-1', { errorCount: 3 });
   });
@@ -132,7 +132,7 @@ describe('background refresh feeds', () => {
 
     const total = await refreshAllFeeds({ storageService, fetchFeed, now: () => 5000 });
 
-    expect(total).toBe(2);
+    expect(total).toEqual({ count: 2, failedCount: 0 });
     expect(fetchFeed).toHaveBeenCalledTimes(2);
   });
 
@@ -182,7 +182,7 @@ describe('background refresh feeds', () => {
         fetchFeed: (url) => boundedFetchFeed(url, fetcher),
       });
       await vi.advanceTimersByTimeAsync(30001);
-      expect(await pending).toBe(1);
+      expect(await pending).toEqual({ count: 1, failedCount: REFRESH_CONCURRENCY });
       expect(fetcher).toHaveBeenCalledTimes(feeds.length);
       expect(storageService.updateFeed).toHaveBeenCalledTimes(REFRESH_CONCURRENCY);
       expect(storageService.commitFeedRefresh).toHaveBeenCalledOnce();
@@ -190,6 +190,23 @@ describe('background refresh feeds', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+
+  it('finishes queued feeds after a storage failure and reports successful additions separately', async () => {
+    const feeds = Array.from({ length: 12 }, (_, index) => createFeed({ id: `feed-${index}` }));
+    const storageService = {
+      getFeeds: vi.fn().mockResolvedValue(feeds),
+      updateFeed: vi.fn(),
+      commitFeedRefresh: vi.fn()
+        .mockRejectedValueOnce(new Error('Storage write failed'))
+        .mockResolvedValue(1),
+    };
+    const fetchFeed = vi.fn().mockResolvedValue({
+      success: true, feed: { title: 'Feed', articles: [] },
+    });
+    expect(await refreshAllFeeds({ storageService, fetchFeed })).toEqual({ count: 11, failedCount: 1 });
+    expect(storageService.commitFeedRefresh).toHaveBeenCalledTimes(12);
   });
 
 });

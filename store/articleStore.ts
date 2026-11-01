@@ -45,6 +45,7 @@ const DEFAULT_FILTER: ArticleFilter = { view: 'inbox', showUnreadOnly: true };
 /** Owns article queries and ensures only the latest requested view can publish results. */
 export function createArticleStore(client: StoreMessageClient) {
   let latestLoadRequest = 0;
+  let latestUnreadRequest = 0;
   return createStore<ArticleState>((set, get) => ({
     articles: [],
     activeArticleId: null,
@@ -85,15 +86,23 @@ export function createArticleStore(client: StoreMessageClient) {
         set({ isLoading: false, error: response.error ?? 'Failed to load articles' });
         return;
       }
-      const articles = response.data?.articles ?? [];
+      const articles = searchArticles(response.data?.articles ?? [], filter.searchQuery ?? '');
+      // Keep a valid selection, but do not leave the reading pane attached to a removed/filtered row.
+      const activeArticleId = get().activeArticleId;
       set({
-        articles: searchArticles(articles, filter.searchQuery ?? ''),
+        articles,
+        activeArticleId: articles.some((article) => article.id === activeArticleId) ? activeArticleId : null,
         isLoading: false,
       });
     },
 
+    /** Prevents an initial/older badge read from overwriting a post-refresh count. */
     async loadUnreadCount() {
+      const requestId = ++latestUnreadRequest;
       const response = await client.send<{ count: number }>({ action: 'GET_UNREAD_COUNT' });
+      if (requestId !== latestUnreadRequest) {
+        return;
+      }
       if (response.success) {
         set({ unreadCount: response.data?.count ?? 0 });
       } else {

@@ -14,6 +14,7 @@ export interface FixtureServer {
     rejectRequests: boolean;
     nativeRequests: NativeRequest[];
   };
+  refresh: { revision: number; rejectRequests: boolean; requests: string[] };
   close(): Promise<void>;
 }
 
@@ -24,6 +25,7 @@ export async function startFixtureServer(): Promise<FixtureServer> {
     rejectRequests: false,
     nativeRequests: [],
   };
+  const refresh: FixtureServer['refresh'] = { revision: 0, rejectRequests: false, requests: [] };
   let fixtureFeedUrl = '';
   const server = createServer((request, response) => {
     let nativeProvider: 'google' | 'anthropic' | null = null;
@@ -80,6 +82,22 @@ export async function startFixtureServer(): Promise<FixtureServer> {
           keyPoints: ['A verified section summary'],
         }) } }],
       }));
+      return;
+    }
+    if (request.url?.startsWith('/refresh-feed.xml')) {
+      refresh.requests.push(request.url);
+      if (refresh.rejectRequests) {
+        response.writeHead(503);
+        response.end('Offline');
+        return;
+      }
+      const source = request.url.endsWith('two') ? 'two' : 'one';
+      const items = Array.from({ length: refresh.revision + 1 }, (_, index) => `
+        <item><guid>${source}-${index}</guid><title>${source} Article ${index}</title>
+        <link>https://example.com/${source}/${index}</link><description>Readable content</description>
+        <pubDate>Tue, 28 Jul 2026 12:00:00 GMT</pubDate></item>`).join('');
+      response.writeHead(200, { 'Content-Type': 'application/rss+xml' });
+      response.end(`<rss><channel><title>Refresh ${source}</title>${items}</channel></rss>`);
       return;
     }
     if (request.url === '/article-1') {
@@ -181,6 +199,7 @@ export async function startFixtureServer(): Promise<FixtureServer> {
     origin: new URL(fixtureFeedUrl).origin,
     feedUrl: fixtureFeedUrl,
     ai,
+    refresh,
     /** Releases the test-local port after the extension profile has been closed. */
     async close() {
       await new Promise<void>((resolve, reject) => {

@@ -4,7 +4,7 @@ import { handleAlarm, REFRESH_ALARM_NAME } from '@/entrypoints/background/alarm'
 describe('background alarm handler', () => {
   it('refreshes feeds, prunes old articles, and updates badge for refresh alarm', async () => {
     const dependencies = {
-      refreshAllFeeds: vi.fn().mockResolvedValue(2),
+      refreshAllFeeds: vi.fn().mockResolvedValue({ count: 2, failedCount: 0 }),
       getSettings: vi.fn().mockResolvedValue({ refreshInterval: 30 }),
       pruneOldArticles: vi.fn(),
       pruneExcessArticles: vi.fn(),

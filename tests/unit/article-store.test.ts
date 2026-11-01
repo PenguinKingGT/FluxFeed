@@ -205,4 +205,19 @@ describe('article store', () => {
     expect(store.getState().summaryStatusByArticleId.a1).toBe('error');
   });
 
+
+  it('does not replace a refreshed unread count with a delayed initial result', async () => {
+    let finish!: (value: unknown) => void;
+    const client = { send: vi.fn()
+      .mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }))
+      .mockResolvedValueOnce({ success: true, data: { count: 2 } }),
+    };
+    const store = createArticleStore(client);
+    const initial = store.getState().loadUnreadCount();
+    await store.getState().loadUnreadCount();
+    finish({ success: true, data: { count: 1 } });
+    await initial;
+    expect(store.getState().unreadCount).toBe(2);
+  });
+
 });

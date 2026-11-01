@@ -140,7 +140,7 @@ describe('background message handler', () => {
     const feed = { id: 'feed-1' } as Feed;
     const storageService = createStorageService();
     storageService.getFeed.mockResolvedValue(feed);
-    const refreshSingleFeed = vi.fn().mockResolvedValue(2);
+    const refreshSingleFeed = vi.fn().mockResolvedValue({ count: 2, failedCount: 0 });
 
     const response = await handleBackgroundMessage(
       { action: 'FEED_REFRESH', payload: { feedId: 'feed-1' } },
@@ -153,7 +153,7 @@ describe('background message handler', () => {
       },
     );
 
-    expect(response).toEqual({ success: true, data: { count: 2 } });
+    expect(response).toEqual({ success: true, data: { count: 2, failedCount: 0 } });
     expect(refreshSingleFeed).toHaveBeenCalledWith(feed);
   });
 
@@ -223,7 +223,7 @@ describe('background message handler', () => {
 
   it('refreshes all feeds and reports the refreshed article count', async () => {
     const storageService = createStorageService();
-    const refreshAllFeeds = vi.fn().mockResolvedValue(7);
+    const refreshAllFeeds = vi.fn().mockResolvedValue({ count: 7, failedCount: 0 });
     const updateBadge = vi.fn();
 
     const response = await handleBackgroundMessage(
@@ -237,7 +237,7 @@ describe('background message handler', () => {
       },
     );
 
-    expect(response).toEqual({ success: true, data: { count: 7 } });
+    expect(response).toEqual({ success: true, data: { count: 7, failedCount: 0 } });
     expect(refreshAllFeeds).toHaveBeenCalledOnce();
     expect(updateBadge).toHaveBeenCalledOnce();
   });
@@ -344,4 +344,22 @@ describe('AI operation routing', () => {
     expect(execute).toHaveBeenCalledWith({ action, payload });
     expect(response).toEqual(result);
   });
+
+  it('reports partial refresh failure while preserving committed additions and updating the badge', async () => {
+    const updateBadge = vi.fn();
+    const response = await handleBackgroundMessage(
+      { action: 'FEED_REFRESH_ALL' },
+      {
+        storageService: createStorageService(),
+        fetchFeed: vi.fn(), updateBadge,
+        refreshSingleFeed: vi.fn(),
+        refreshAllFeeds: vi.fn().mockResolvedValue({ count: 3, failedCount: 1 }),
+      },
+    );
+    expect(response).toEqual({
+      success: false, error: 'FEED_REFRESH_FAILED', data: { count: 3, failedCount: 1 },
+    });
+    expect(updateBadge).toHaveBeenCalledOnce();
+  });
+
 });

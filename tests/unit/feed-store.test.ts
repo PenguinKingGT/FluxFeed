@@ -75,4 +75,22 @@ describe('feed store', () => {
       error: 'Extension context invalidated',
     });
   });
+
+  it('retains refresh errors after metadata reload and recovers from rejected adapters', async () => {
+    const client = { send: vi.fn()
+      .mockRejectedValueOnce(new Error('Worker stopped'))
+      .mockResolvedValueOnce({ success: false, error: 'FEED_REFRESH_FAILED' })
+      .mockResolvedValueOnce({ success: true, data: { feeds: [] } })
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValueOnce({ success: true, data: { feeds: [] } }),
+    };
+    const store = createFeedStore(client);
+    await store.getState().refreshFeed();
+    expect(store.getState()).toMatchObject({ error: 'FEED_REFRESH_FAILED', isLoading: false });
+    await store.getState().refreshFeed();
+    expect(store.getState()).toMatchObject({ error: 'FEED_REFRESH_FAILED', isLoading: false });
+    await store.getState().refreshFeed();
+    expect(store.getState()).toMatchObject({ error: null, isLoading: false });
+  });
+
 });

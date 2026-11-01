@@ -1,4 +1,5 @@
 export const en = {
+  'reader.refreshFailed': 'Couldn\'t refresh feeds. Please try again.',
   'app.subtitle': 'RSS Reader',
   'feed.fetchTimeout': 'The feed request timed out. Please try again.',
   'feed.responseTooLarge': 'This feed is too large to read.',

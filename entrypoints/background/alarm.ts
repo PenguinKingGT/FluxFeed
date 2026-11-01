@@ -1,3 +1,5 @@
+import type { FeedRefreshResult } from '@/lib/types/feed';
+
 export const REFRESH_ALARM_NAME = 'refresh-feeds';
 export const GLOBAL_REFRESH_ALARM_NAME = REFRESH_ALARM_NAME;
 
@@ -28,7 +30,7 @@ export async function registerRefreshAlarm(
 }
 
 interface AlarmHandlerDependencies {
-  refreshAllFeeds(): Promise<number>;
+  refreshAllFeeds(): Promise<FeedRefreshResult>;
   getSettings(): Promise<{
     refreshInterval: number;
     retentionDays?: number;

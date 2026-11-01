@@ -12,3 +12,9 @@ export interface Feed {
   errorCount: number;
   createdAt: number;
 }
+
+/** Reports committed additions separately from failed feeds, including partial refreshes. */
+export interface FeedRefreshResult {
+  count: number;
+  failedCount: number;
+}

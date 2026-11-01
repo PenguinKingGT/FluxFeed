@@ -42,6 +42,7 @@ export function ReaderLayout({ view }: ReaderLayoutProps) {
   const removeFeed = useFeedStore((state) => state.removeFeed);
   const loadFeeds = useFeedStore((state) => state.loadFeeds);
   const refreshFeed = useFeedStore((state) => state.refreshFeed);
+  const feedError = useFeedStore((state) => state.error);
   const groups = useGroupStore((state) => state.groups);
   const loadGroups = useGroupStore((state) => state.loadGroups);
   const createGroup = useGroupStore((state) => state.createGroup);
@@ -49,6 +50,12 @@ export function ReaderLayout({ view }: ReaderLayoutProps) {
   const moveTreeNode = useGroupStore((state) => state.moveTreeNode);
   const settings = useSettingsStore((state) => state.settings);
   const activeArticle = articles.find((article) => article.id === activeArticleId);
+
+  /** Re-reads the current view after refresh; route/search changes during the request remain authoritative. */
+  async function refreshReader(): Promise<void> {
+    await refreshFeed(view === 'feed' ? params.feedId : undefined);
+    await Promise.all([loadArticles(), loadUnreadCount()]);
+  }
 
   /** Toggles desktop navigation independently of the responsive drawer and focus mode. */
   function toggleSidebar() {
@@ -192,9 +199,9 @@ export function ReaderLayout({ view }: ReaderLayoutProps) {
         activeArticleId={activeArticleId}
         filter={filter}
         isLoading={isLoading}
-        error={articleError}
+        error={articleError || (feedError === 'FEED_REFRESH_FAILED' ? t('reader.refreshFailed') : feedError)}
         setFilter={setFilter}
-        refreshFeed={() => refreshFeed(view === 'feed' ? params.feedId : undefined)}
+        refreshFeed={refreshReader}
         setActiveArticle={setActiveArticle}
         onOpenNavigation={() => setIsNavigationOpen(true)}
         isSidebarCollapsed={isSidebarCollapsed}

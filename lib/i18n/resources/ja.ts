@@ -1,6 +1,7 @@
 import type { en } from './en';
 
 export const ja: Record<keyof typeof en, string> = {
+  'reader.refreshFailed': 'フィードを更新できませんでした。もう一度お試しください。',
   'app.subtitle': 'RSSリーダー',
   'feed.fetchTimeout': 'フィードの取得がタイムアウトしました。もう一度お試しください。',
   'feed.responseTooLarge': 'このフィードは大きすぎるため読み込めません。',

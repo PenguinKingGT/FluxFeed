@@ -41,6 +41,8 @@ export function ArticlePanel({
   const { t } = useTranslation();
   const [query, setQuery] = useState(filter.searchQuery ?? '');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const refreshing = useRef(false);
   const parentRef = useRef<HTMLDivElement>(null);
   const pendingFocusId = useRef<string | null>(null);
   const feedById = useMemo(() => new Map(feeds.map((feed) => [feed.id, feed])), [feeds]);
@@ -90,11 +92,20 @@ export function ArticlePanel({
     return () => window.clearTimeout(timer);
   }, [query, setFilter]);
 
-  async function handleRefresh() {
+  /** Serializes user refreshes and restores a retryable button even if an adapter rejects. */
+  async function handleRefresh(): Promise<void> {
+    if (refreshing.current) {
+      return;
+    }
+    refreshing.current = true;
+    setRefreshError(null);
     setIsRefreshing(true);
     try {
       await refreshFeed();
+    } catch {
+      setRefreshError(t('reader.refreshFailed'));
     } finally {
+      refreshing.current = false;
       setIsRefreshing(false);
     }
   }
@@ -163,9 +174,9 @@ export function ArticlePanel({
           </Button>
         </div>
       </header>
-      {error ? (
+      {error || refreshError ? (
         <p role="alert" className="border-b border-destructive/25 bg-destructive/8 px-4 py-2 text-xs text-destructive">
-          {error}
+          {error || refreshError}
         </p>
       ) : null}
       <div ref={parentRef} className="reader-scrollbar flex-1 overflow-y-auto">

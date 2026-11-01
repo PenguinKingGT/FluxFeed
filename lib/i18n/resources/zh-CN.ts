@@ -1,6 +1,7 @@
 import type { en } from './en';
 
 export const zhCN: Record<keyof typeof en, string> = {
+  'reader.refreshFailed': '订阅刷新失败，请重试。',
   'app.subtitle': 'RSS阅读器',
   'feed.fetchTimeout': '订阅请求超时，请重试。',
   'feed.responseTooLarge': '订阅内容过大，暂时无法读取。',

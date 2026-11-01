@@ -1,3 +1,4 @@
+import type { FeedRefreshResult } from '@/lib/types/feed';
 import type { StorageService } from '@/lib/db';
 import type { AiModule } from '@/lib/ai/ai-module';
 import type { FetchFeedResult } from '@/lib/feed';
@@ -35,8 +36,8 @@ interface MessageHandlerDependencies {
   >;
   fetchFeed(url: string): Promise<FetchFeedResult>;
   updateBadge(): Promise<void>;
-  refreshSingleFeed(feed: Feed): Promise<number>;
-  refreshAllFeeds(): Promise<number>;
+  refreshSingleFeed(feed: Feed): Promise<FeedRefreshResult>;
+  refreshAllFeeds(): Promise<FeedRefreshResult>;
   registerRefreshAlarm?: (intervalMinutes: number) => Promise<void>;
   sessionStorage?: {
     set(value: Record<string, unknown>): Promise<void> | void;
@@ -77,6 +78,14 @@ interface ArticleStarPayload {
 interface NormalizedMessage {
   action: MessageAction;
   payload?: unknown;
+}
+
+/** Preserves committed additions while making fetch failures visible across the Runtime boundary. */
+function refreshResponse(result: FeedRefreshResult): MessageResponse<FeedRefreshResult> {
+  if (result.failedCount > 0) {
+    return { success: false, error: 'FEED_REFRESH_FAILED', data: result };
+  }
+  return { success: true, data: result };
 }
 
 function normalizeMessage(message: Message | BackgroundMessage): NormalizedMessage {
@@ -206,20 +215,20 @@ export async function handleBackgroundMessage(
             return { success: false, error: 'Feed not found' };
           }
 
-          const count = await dependencies.refreshSingleFeed(feed);
+          const result = await dependencies.refreshSingleFeed(feed);
           await dependencies.updateBadge();
-          return { success: true, data: { count } };
+          return refreshResponse(result);
         }
 
-        const count = await dependencies.refreshAllFeeds();
+        const result = await dependencies.refreshAllFeeds();
         await dependencies.updateBadge();
-        return { success: true, data: { count } };
+        return refreshResponse(result);
       }
 
       case 'FEED_REFRESH_ALL': {
-        const count = await dependencies.refreshAllFeeds();
+        const result = await dependencies.refreshAllFeeds();
         await dependencies.updateBadge();
-        return { success: true, data: { count } };
+        return refreshResponse(result);
       }
 
       case 'FEED_LIST': {
