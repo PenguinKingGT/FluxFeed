@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { AlertCircle, ArrowRight, RefreshCw, Sparkles, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { planArticleSummary } from '@/lib/ai/article-chunker';
+import type { ArticleSummaryInput } from '@/lib/reader/prepare-article-content';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { countUnicodeCharacters, isAiConfigured } from '@/lib/ai/ai-preferences';
+import { isAiConfigured } from '@/lib/ai/ai-preferences';
 import { DEFAULT_SETTINGS } from '@/lib/db';
 import type { Article, Settings } from '@/lib/types';
 
@@ -20,7 +20,7 @@ const AI_SETUP_PROMPT_DISMISSED_KEY = 'fluxfeed.ai.setupPromptDismissed';
 
 interface AiSummaryPanelProps {
   article: Article;
-  contentText: string;
+  input: ArticleSummaryInput | null;
   settings: Settings;
   status: 'idle' | 'loading' | 'success' | 'error';
   stale: boolean;
@@ -31,10 +31,10 @@ interface AiSummaryPanelProps {
   ) => Promise<void>;
 }
 
-/** Displays cached summaries and requires explicit consent for partial processing. */
+/** Reuses prepared text and scope to show summaries and require explicit partial-processing consent. */
 export function AiSummaryPanel({
   article,
-  contentText,
+  input,
   settings,
   status,
   stale,
@@ -42,7 +42,8 @@ export function AiSummaryPanel({
 }: AiSummaryPanelProps) {
   const { t } = useTranslation();
   const summary = article.aiSummary;
-  const plan = useMemo(() => planArticleSummary(contentText), [contentText]);
+  const contentText = input?.contentText ?? '';
+  const plan = input?.plan;
   const [pendingConfirmation, setPendingConfirmation] = useState<{
     articleId: string;
     contentText: string;
@@ -57,7 +58,7 @@ export function AiSummaryPanel({
       return false;
     }
   });
-  const characterCount = countUnicodeCharacters(contentText);
+  const characterCount = input?.characterCount ?? 0;
   const belowHardMinimum = characterCount < 80;
   const belowAutoMinimum = ai.autoSummarizeOnOpen
     && ai.autoSummarizeMinCharacters > 0
@@ -76,14 +77,14 @@ export function AiSummaryPanel({
     summary
     || status === 'loading'
     || status === 'error'
-    || plan.chunks.length > 1
-    || plan.isPartial
+    || (plan?.chunks.length ?? 0) > 1
+    || plan?.isPartial
     || emptyNotice,
   );
 
   /** Captures the exact article and text so consent cannot carry to another article. */
   function requestSummary(force = false) {
-    if (plan.isPartial) {
+    if (plan?.isPartial) {
       setPendingConfirmation({ articleId: article.id, contentText, force });
       return;
     }
@@ -185,12 +186,12 @@ export function AiSummaryPanel({
       {/* Empty summaries stay a single row; expand only for content or useful feedback. */}
       {showDetails ? (
         <div className="border-t border-border/60 px-4 py-3">
-          {plan.chunks.length > 1 && status !== 'loading' ? (
+          {(plan?.chunks.length ?? 0) > 1 && status !== 'loading' ? (
             <p className="mb-2 text-xs text-muted-foreground">
-              {t('ai.chunkRequests', { count: plan.estimatedRequests })}
+              {t('ai.chunkRequests', { count: plan?.estimatedRequests })}
             </p>
           ) : null}
-          {plan.isPartial && !summary ? (
+          {plan?.isPartial && !summary ? (
             <p className="mb-2 text-xs text-muted-foreground">{t('ai.partialDescription')}</p>
           ) : null}
           {summary?.isPartial ? (

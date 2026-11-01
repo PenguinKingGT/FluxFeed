@@ -1,12 +1,12 @@
-import { planArticleSummary } from '@/lib/ai/article-chunker';
+import type { ArticleSummaryInput } from '@/lib/reader/prepare-article-content';
 import { useEffect } from 'react';
 import type { Article, Settings } from '@/lib/types';
-import { countUnicodeCharacters, isAiConfigured } from '@/lib/ai/ai-preferences';
+import { isAiConfigured } from '@/lib/ai/ai-preferences';
 import { DEFAULT_SETTINGS } from '@/lib/db';
 
 interface UseAutoSummaryOptions {
   article: Article | null;
-  contentText: string;
+  input: ArticleSummaryInput | null;
   settings: Settings;
   status: 'idle' | 'loading' | 'success' | 'error';
   summarizeArticle: (
@@ -16,10 +16,10 @@ interface UseAutoSummaryOptions {
   ) => Promise<void>;
 }
 
-/** Automatically requests complete summaries only; partial processing needs consent. */
+/** Reuses prepared eligibility data; automatic requests never permit partial processing. */
 export function useAutoSummary({
   article,
-  contentText,
+  input,
   settings,
   status,
   summarizeArticle,
@@ -30,8 +30,9 @@ export function useAutoSummary({
   const enabled = ai.autoSummarizeOnOpen && ai.showArticleSummary !== false;
   const minimum = ai.autoSummarizeMinCharacters;
   const configured = isAiConfigured(ai);
-  const isPartial = planArticleSummary(contentText).isPartial;
-  const characterCount = countUnicodeCharacters(contentText);
+  const contentText = input?.contentText ?? '';
+  const isPartial = input?.plan.isPartial ?? false;
+  const characterCount = input?.characterCount ?? 0;
 
   useEffect(() => {
     if (

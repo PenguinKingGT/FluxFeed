@@ -31,6 +31,7 @@ export function chunkDigestArticles(
   return chunks;
 }
 
+/** Stops dispatch on the first rejection and drains started tasks before exposing that failure. */
 export async function mapWithConcurrency<T, R>(
   values: T[],
   concurrency: number,
@@ -38,14 +39,25 @@ export async function mapWithConcurrency<T, R>(
 ): Promise<R[]> {
   const results: R[] = [];
   let nextIndex = 0;
+  // A wrapper also preserves rejection with undefined, null, or another falsy value.
+  let failure: { reason: unknown } | undefined;
 
-  async function worker() {
-    while (nextIndex < values.length) {
-      const index = nextIndex++;
-      results[index] = await mapper(values[index], index);
+  /** Claims work only while healthy; every started mapper is awaited even after another fails. */
+  async function worker(): Promise<void> {
+    while (!failure && nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      try {
+        results[index] = await mapper(values[index], index);
+      } catch (reason) {
+        failure ??= { reason };
+      }
     }
   }
 
   await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, () => worker()));
+  if (failure) {
+    throw failure.reason;
+  }
   return results;
 }

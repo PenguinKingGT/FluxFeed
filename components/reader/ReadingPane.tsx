@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef } from 'react';
 import { ArrowLeft, BookOpen, Menu } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { extractPlainText } from '@/lib/security/sanitize-html';
+import { prepareArticleContent } from '@/lib/reader/prepare-article-content';
+import { isAiConfigured } from '@/lib/ai/ai-preferences';
+import { DEFAULT_SETTINGS } from '@/lib/db/defaults';
 import type { Article, Feed, Group, Settings } from '@/lib/types';
 import { ActionBar } from './ActionBar';
 import { AiSummaryPanel } from './AiSummaryPanel';
@@ -63,9 +65,17 @@ export function ReadingPane({
   const article = activeIndex >= 0 ? articles[activeIndex] : null;
   const feed = article ? feedById.get(article.feedId) : undefined;
   const folderName = feed?.groupId ? groupById.get(feed.groupId)?.name : undefined;
-  const contentText = useMemo(
-    () => article ? extractPlainText(article.content, true) : '',
+  // Content identity, rather than article metadata, owns the expensive rendering and AI work.
+  const content = useMemo(
+    () => article ? prepareArticleContent(article.content) : null,
     [article?.content],
+  );
+  const ai = settings.ai ?? DEFAULT_SETTINGS.ai;
+  const needsSummaryInput = ai.showArticleSummary !== false && isAiConfigured(ai);
+  const summaryInput = needsSummaryInput ? content?.getSummaryInput() ?? null : null;
+  const readingTime = useMemo(
+    () => estimateReadMinutes(article?.content ?? '', settings.language),
+    [article?.content, settings.language],
   );
   const summaryStatus = article
     ? summaryStatusByArticleId[article.id] ?? 'idle'
@@ -73,7 +83,7 @@ export function ReadingPane({
 
   useAutoSummary({
     article,
-    contentText,
+    input: summaryInput,
     settings,
     status: summaryStatus,
     summarizeArticle,
@@ -91,7 +101,7 @@ export function ReadingPane({
     }
   }, [article?.id, article?.isRead, markRead, settings.markReadOnOpen]);
 
-  if (!article) {
+  if (!article || !content) {
     return (
       <section className="reader-reading-pane reader-scrollbar flex h-screen min-w-0 flex-1 items-center justify-center overflow-y-auto bg-background">
         <div className="max-w-sm px-8 text-center text-muted-foreground">
@@ -150,20 +160,20 @@ export function ReadingPane({
               </>
             ) : null}
             <span aria-hidden="true">·</span>
-            <span>{estimateReadMinutes(article.content, settings.language)}</span>
+            <span>{readingTime}</span>
           </div>
         </header>
         {settings.ai?.showArticleSummary !== false ? (
           <AiSummaryPanel
             article={article}
-            contentText={contentText}
+            input={summaryInput}
             settings={settings}
             status={summaryStatus}
             stale={summaryStaleByArticleId[article.id] ?? false}
             summarizeArticle={summarizeArticle}
           />
         ) : null}
-        <ArticleContent html={article.content} settings={settings} />
+        <ArticleContent content={content} settings={settings} />
         <footer className="mt-24 flex flex-col items-center border-t border-border pt-10">
           <div className="mb-7 text-[10px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">{t('reader.endOfArticle')}</div>
           <div className="flex gap-3">

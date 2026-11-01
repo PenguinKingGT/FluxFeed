@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { prepareArticleSummaryInput } from '@/lib/reader/prepare-article-content';
 import { AiSummaryPanel } from '@/components/reader/AiSummaryPanel';
 import { useAutoSummary } from '@/components/reader/use-auto-summary';
 import { ARTICLE_MAX_CHARACTERS } from '@/lib/ai/article-chunker';
@@ -42,7 +43,7 @@ function AutoSummaryProbe({ text, summarize }: {
 }) {
   useAutoSummary({
     article,
-    contentText: text,
+    input: prepareArticleSummaryInput(text),
     settings,
     status: 'idle',
     summarizeArticle: summarize,
@@ -58,7 +59,7 @@ describe('long article summary controls', () => {
     render(
       <AiSummaryPanel
         article={article}
-        contentText={longText}
+        input={prepareArticleSummaryInput(longText)}
         settings={settings}
         status="idle"
         stale={false}
@@ -104,7 +105,7 @@ describe('long article summary controls', () => {
             chunkCount: 5,
           },
         }}
-        contentText={longText}
+        input={prepareArticleSummaryInput(longText)}
         settings={settings}
         status="error"
         stale={false}
@@ -120,7 +121,7 @@ describe('long article summary controls', () => {
   it('does not carry confirmation over to a different article', () => {
     const summarizeArticle = vi.fn();
     const props = {
-      contentText: longText,
+      input: prepareArticleSummaryInput(longText),
       settings,
       status: 'idle' as const,
       stale: false,

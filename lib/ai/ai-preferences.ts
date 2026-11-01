@@ -40,6 +40,10 @@ export function isAiConfigured(preferences: AiPreferences): boolean {
 
 /** Counts Unicode code points for user-facing automatic summary thresholds. */
 export function countUnicodeCharacters(value: string): number {
-  return Array.from(value).length;
+  let count = 0;
+  for (const _character of value) {
+    count += 1;
+  }
+  return count;
 }
 

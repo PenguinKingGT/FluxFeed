@@ -110,8 +110,13 @@ export function extractSummary(html: string, maxLength = 200): string {
 
 /** Extracts safe source text, optionally retaining paragraph breaks for AI chunks. */
 export function extractPlainText(html: string, preserveParagraphs = false): string {
+  return extractSanitizedText(sanitizeHtml(html), preserveParagraphs);
+}
+
+/** Extracts text from already sanitized reader HTML; never use this result as renderable HTML. */
+export function extractSanitizedText(sanitizedHtml: string, preserveParagraphs = false): string {
   const template = document.createElement('template');
-  template.innerHTML = sanitizeHtml(html);
+  template.innerHTML = sanitizedHtml;
   if (preserveParagraphs) {
     template.content.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, tr')
       .forEach((element) => {

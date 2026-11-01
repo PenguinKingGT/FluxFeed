@@ -4,16 +4,16 @@ import { cn } from '@/lib/utils';
 import { normalizeArticleStyle } from '@/lib/reader/article-styles';
 import type { Settings } from '@/lib/types';
 import { getReadingFontSize } from '@/lib/settings/reading-font-size';
-import { sanitizeHtml } from '@/lib/security/sanitize-html';
+import type { PreparedArticleContent } from '@/lib/reader/prepare-article-content';
 
 interface ArticleContentProps {
-  html: string;
+  content: PreparedArticleContent;
   settings: Settings;
 }
 
-/** Applies a bundled prose style to sanitized HTML without changing app colors or reading fonts. */
-export function ArticleContent({ html, settings }: ArticleContentProps) {
-  const cleanHtml = useMemo(() => highlightArticleCode(sanitizeHtml(html)), [html]);
+/** Applies a bundled prose style to shared sanitized HTML without changing app colors or reading fonts. */
+export function ArticleContent({ content, settings }: ArticleContentProps) {
+  const cleanHtml = useMemo(() => highlightArticleCode(content.sanitizedHtml), [content.sanitizedHtml]);
   const articleStyle = normalizeArticleStyle(settings.articleStyle);
 
   return (

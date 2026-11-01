@@ -262,4 +262,39 @@ ${JSON.stringify({
     expect(result.digest.entries[0].brief).toHaveLength(800);
     expect(result.digest.entries[0].topics).toHaveLength(3);
   });
+
+  it('drains started requests after a terminal failure without dispatching later batches or synthesis', async () => {
+    let finish!: (value: string) => void;
+    const startedRequest = new Promise<string>((resolve) => { finish = resolve; });
+    const failure = new AiRequestError('AI_REQUEST_FAILED');
+    const client = {
+      complete: vi.fn()
+        .mockRejectedValueOnce(failure)
+        .mockReturnValueOnce(startedRequest)
+        .mockResolvedValue('{"entries":[],"topicHints":[]}'),
+    };
+    const articles = Array.from({ length: 61 }, (_, index) => ({
+      articleId: `a${index}`, title: `Article ${index}`, source: 'Feed', author: '',
+      publishedAt: index, summary: 'Fallback', contentExcerpt: 'Body',
+    }));
+    const input = {
+      dayKey: '2026-07-28', timeZone: 'Asia/Shanghai', scope: 'all' as const,
+      articles, totalArticles: articles.length, preferences: DEFAULT_SETTINGS.ai,
+      sourceFingerprint: 'fingerprint',
+    };
+    let settled = false;
+    const outcome = generateDailyDigest(client, input)
+      .then(() => null, (error: unknown) => error)
+      .finally(() => { settled = true; });
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(settled).toBe(false);
+    finish('{"entries":[],"topicHints":[]}');
+    expect(await outcome).toBe(failure);
+    expect(client.complete).toHaveBeenCalledTimes(2);
+    // A subsequent user retry starts only after the previous in-flight request has settled.
+    client.complete.mockResolvedValue('{"entries":[],"topicHints":[]}');
+    await generateDailyDigest(client, input);
+    expect(client.complete).toHaveBeenCalledTimes(7);
+  });
+
 });

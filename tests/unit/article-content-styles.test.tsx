@@ -1,5 +1,6 @@
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { prepareArticleContent } from '@/lib/reader/prepare-article-content';
 import { ArticleContent } from '@/components/reader/ArticleContent';
 import { DEFAULT_SETTINGS } from '@/lib/db';
 import { ARTICLE_STYLES, normalizeArticleStyle } from '@/lib/reader/article-styles';
@@ -15,7 +16,7 @@ describe('article prose styles', () => {
   afterEach(cleanup);
 
   it.each(ARTICLE_STYLES)('renders safe semantic content with the %s style', (articleStyle) => {
-    const { container } = render(<ArticleContent html={html} settings={{ ...DEFAULT_SETTINGS, articleStyle }} />);
+    const { container } = render(<ArticleContent content={prepareArticleContent(html)} settings={{ ...DEFAULT_SETTINGS, articleStyle }} />);
     const prose = container.firstElementChild as HTMLElement;
     expect(prose.dataset.articleStyle).toBe(articleStyle);
     expect(prose.style.fontSize).toBe('17px');
@@ -30,15 +31,15 @@ describe('article prose styles', () => {
   it('keeps original styling for legacy preferences and unknown values', () => {
     expect(normalizeArticleStyle(undefined)).toBe('default');
     expect(normalizeArticleStyle('body { color: red }')).toBe('default');
-    const { container } = render(<ArticleContent html={html} settings={{ ...DEFAULT_SETTINGS, articleStyle: undefined }} />);
+    const { container } = render(<ArticleContent content={prepareArticleContent(html)} settings={{ ...DEFAULT_SETTINGS, articleStyle: undefined }} />);
     expect(container.firstElementChild?.getAttribute('data-article-style')).toBe('default');
     expect(container.firstElementChild?.className).not.toContain('article-styled');
   });
 
   it('changes presentation without rewriting article HTML', () => {
-    const { container, rerender } = render(<ArticleContent html={html} settings={DEFAULT_SETTINGS} />);
+    const { container, rerender } = render(<ArticleContent content={prepareArticleContent(html)} settings={DEFAULT_SETTINGS} />);
     const originalHtml = container.firstElementChild?.innerHTML;
-    rerender(<ArticleContent html={html} settings={{ ...DEFAULT_SETTINGS, articleStyle: 'vue', fontSize: 'large' }} />);
+    rerender(<ArticleContent content={prepareArticleContent(html)} settings={{ ...DEFAULT_SETTINGS, articleStyle: 'vue', fontSize: 'large' }} />);
     expect(container.firstElementChild?.innerHTML).toBe(originalHtml);
     expect((container.firstElementChild as HTMLElement).style.fontSize).toBe('19px');
   });
