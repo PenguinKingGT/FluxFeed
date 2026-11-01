@@ -1,0 +1,267 @@
+/* Bundled MIT adaptations of Drake, Purple, Ursine and Lapis.
+   Sources and attribution: docs/features/article-styles.md; licenses: public/licenses/.
+   Only document elements are themed. App colors, fonts, sizing and safe HTML remain independent. */
+.reader-prose:is([data-article-style='drake'], [data-article-style='purple'], [data-article-style='ursine'], [data-article-style='lapis']) {
+  --tw-prose-body: var(--document-text);
+  --tw-prose-bold: var(--document-heading);
+  color: var(--document-text);
+}
+.reader-prose:is([data-article-style='drake'], [data-article-style='purple'], [data-article-style='ursine'], [data-article-style='lapis']) :is(h1, h2, h3, h4, h5, h6, strong) {
+  color: var(--document-heading);
+}
+.reader-prose:is([data-article-style='drake'], [data-article-style='purple'], [data-article-style='ursine'], [data-article-style='lapis']) blockquote {
+  color: var(--document-text);
+}
+.reader-prose:is([data-article-style='drake'], [data-article-style='purple'], [data-article-style='ursine'], [data-article-style='lapis']) :not(pre) > code {
+  background: var(--document-inline);
+}
+
+/* Drake: coral details, centered main heading and flat charcoal code blocks. */
+.reader-prose[data-article-style='drake'] {
+  --document-paper: #ffffff;
+  --document-text: #333333;
+  --document-heading: #273849;
+  --document-inline: #fdefee;
+  --article-link: #d63200;
+  --article-soft: #fdefee;
+  --article-rule: #dfe2e5;
+  --article-inline: #d63200;
+  --article-code-surface: #2b2b2b;
+  --article-code-text: #a9b7c6;
+  --article-leading: 1.75;
+  --drake-accent: #e95f59;
+}
+.dark .reader-prose[data-article-style='drake'] {
+  --document-paper: #2b2b2b;
+  --document-text: #acb7c4;
+  --document-heading: #bbc9d7;
+  --document-inline: #333c48;
+  --article-link: #58a1d6;
+  --article-inline: #58a1d6;
+  --article-soft: #333c48;
+  --article-rule: #535455;
+  --article-code-surface: #222222;
+  --drake-accent: #3473b0;
+}
+.reader-prose[data-article-style='drake'] h1 {
+  text-align: center;
+  font-size: 2em;
+}
+.reader-prose[data-article-style='drake'] h2 {
+  font-size: 1.65em;
+  margin-bottom: 1em;
+}
+.reader-prose[data-article-style='drake'] a {
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+}
+.reader-prose[data-article-style='drake'] a:hover {
+  text-decoration: none;
+  border-bottom-color: var(--drake-accent);
+}
+.reader-prose[data-article-style='drake'] blockquote {
+  border-inline-start: 4px solid var(--drake-accent);
+  padding: 0.75em 1em;
+}
+.reader-prose[data-article-style='drake'] li::marker {
+  color: var(--drake-accent);
+}
+.reader-prose[data-article-style='drake'] pre {
+  --syntax-keyword: #cc7832;
+  --syntax-string: #a5c261;
+  --syntax-number: #6897bb;
+  --syntax-title: #ffc66d;
+  --syntax-attribute: #a9b7c6;
+  --syntax-comment: #9b9b9b;
+  border: 0;
+  border-radius: 0;
+}
+.reader-prose[data-article-style='drake'] :is(th, tbody tr:nth-child(even)) {
+  background: color-mix(in srgb, var(--document-text) 4%, var(--document-paper));
+}
+
+/* Purple: violet heading rails, teal links and soft lavender inline code. */
+.reader-prose[data-article-style='purple'] {
+  --document-paper: #ffffff;
+  --document-text: #444444;
+  --document-heading: #8064a9;
+  --document-inline: #f4f2f9;
+  /* Slightly deepen the upstream teal for readable normal-size links. */
+  --article-link: #167e73;
+  --article-soft: #f4f2f9;
+  --article-rule: #e7e7e7;
+  --article-inline: #745fb5;
+  --article-code-surface: #f8f6fc;
+  --article-code-text: #444444;
+  --article-leading: 1.8;
+}
+.dark .reader-prose[data-article-style='purple'] {
+  /* Purple has no upstream dark variant; retain its violet/teal hierarchy on a dark paper. */
+  --document-paper: #211d29;
+  --document-text: #e4dfea;
+  --document-heading: #c3abe6;
+  --document-inline: #332b41;
+  --article-link: #72cbbd;
+  --article-soft: #2d2638;
+  --article-rule: #4b405b;
+  --article-inline: #d1b9f1;
+  --article-code-surface: #262131;
+  --article-code-text: #e4dfea;
+}
+.reader-prose[data-article-style='purple'] :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 500;
+  line-height: 1.3;
+}
+.reader-prose[data-article-style='purple'] h1 {
+  text-align: center;
+}
+.reader-prose[data-article-style='purple'] h1::after {
+  content: '';
+  display: block;
+  width: 6rem;
+  margin: 0.4em auto 0;
+  border-bottom: 2px solid var(--document-heading);
+}
+.reader-prose[data-article-style='purple'] h2 {
+  padding-inline-start: 0.4em;
+  border-inline-start: 0.4em solid var(--document-heading);
+  border-bottom: 1px solid var(--document-heading);
+}
+.reader-prose[data-article-style='purple'] blockquote {
+  background: transparent;
+  border-inline-start: 5px solid color-mix(in srgb, var(--document-heading) 35%, transparent);
+}
+.reader-prose[data-article-style='purple'] pre {
+  border-radius: 6px;
+  border-color: color-mix(in srgb, var(--document-heading) 25%, var(--document-paper));
+}
+.reader-prose[data-article-style='purple'] ul > li::marker {
+  color: var(--document-heading);
+}
+
+/* Ursine: Bear-inspired Polar/Umbra papers, compact prose and an inset quotation rail. */
+.reader-prose[data-article-style='ursine'] {
+  --document-paper: #fbfbfb;
+  --document-text: #333333;
+  --document-heading: #333333;
+  --document-inline: #fafafa;
+  /* Deepen Polar's original red slightly to preserve text-link contrast on its pale paper. */
+  --article-link: #c03f45;
+  --article-soft: #eeeeee;
+  --article-rule: #b4b4b4;
+  --article-inline: #a83d42;
+  --article-code-surface: #fafafa;
+  --article-code-text: #333333;
+  --article-leading: 1.7;
+  --ursine-quote: #827676;
+}
+.dark .reader-prose[data-article-style='ursine'] {
+  --document-paper: #1e2022;
+  --document-text: #dddddd;
+  --document-heading: #eeeeee;
+  --document-inline: #282a36;
+  --article-link: #6bcafb;
+  --article-soft: #34363b;
+  --article-rule: #5b5b5b;
+  --article-inline: #6bcafb;
+  --article-code-surface: #282a36;
+  --article-code-text: #dddddd;
+  --ursine-quote: #a3a9b6;
+}
+.reader-prose[data-article-style='ursine'] p {
+  margin-block: 0.65em;
+}
+.reader-prose[data-article-style='ursine'] :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 700;
+  margin-block-start: 1.5em;
+}
+.reader-prose[data-article-style='ursine'] blockquote {
+  position: relative;
+  margin: 1em 0 1em 1.5em;
+  padding: 0 0 0 0.25em;
+  border: 0;
+  color: var(--ursine-quote);
+  background: transparent;
+}
+.reader-prose[data-article-style='ursine'] blockquote::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -1.5em;
+  width: 4px;
+  background: var(--article-link);
+}
+.reader-prose[data-article-style='ursine'] :not(pre) > code {
+  border: 1px solid color-mix(in srgb, var(--document-text) 15%, transparent);
+  border-radius: 4px;
+}
+.reader-prose[data-article-style='ursine'] pre {
+  border-radius: 4px;
+}
+.reader-prose[data-article-style='ursine'] :is(th, tbody tr:nth-child(even)) {
+  background: var(--article-soft);
+}
+
+/* Lapis: blue badge headings, airy lists and cool documentation surfaces. */
+.reader-prose[data-article-style='lapis'] {
+  --document-paper: #ffffff;
+  --document-text: #40464f;
+  --document-heading: #4870ac;
+  --document-inline: #edf2f8;
+  --article-link: #4870ac;
+  --article-soft: #f6f8fa;
+  --article-rule: #cdd8e8;
+  --article-inline: #4870ac;
+  --article-code-surface: #f6f8fa;
+  --article-code-text: #40464f;
+  --article-leading: 1.85;
+  --lapis-badge: #4870ac;
+  --lapis-badge-text: #ffffff;
+}
+.dark .reader-prose[data-article-style='lapis'] {
+  --document-paper: #1e222a;
+  --document-text: #e4e4e4;
+  --document-heading: #abbad4;
+  --document-inline: #2a2f3b;
+  --article-link: #abbad4;
+  --article-soft: #2a2f3b;
+  --article-rule: #47556d;
+  --article-inline: #abbad4;
+  --article-code-surface: #080e1d;
+  --article-code-text: #abbad4;
+  --lapis-badge: #47556d;
+  --lapis-badge-text: #e4e4e4;
+}
+.reader-prose[data-article-style='lapis'] h1 {
+  text-align: center;
+}
+.reader-prose[data-article-style='lapis'] h2 {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0.1em 0.6em;
+  border-radius: 4px;
+  background: var(--lapis-badge);
+  color: var(--lapis-badge-text);
+}
+.reader-prose[data-article-style='lapis'] h2 :is(a, code, strong) {
+  color: inherit;
+  background: transparent;
+}
+.reader-prose[data-article-style='lapis'] li {
+  margin-block: 0.5em;
+}
+.reader-prose[data-article-style='lapis'] blockquote {
+  padding: 0.85em 1.2em;
+  border-inline-start: 3px solid var(--article-link);
+}
+.reader-prose[data-article-style='lapis'] pre {
+  border: 0;
+  border-radius: 8px;
+}
+.reader-prose[data-article-style='lapis'] :is(th, td) {
+  border-inline: 0;
+}
+.reader-prose[data-article-style='lapis'] th {
+  background: var(--document-inline);
+  color: var(--document-heading);
+}

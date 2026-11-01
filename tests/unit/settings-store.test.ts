@@ -326,6 +326,21 @@ describe('settings store', () => {
     expect(store.getState().settings.articleStyle).toBe('default');
   });
 
+  it.each(['drake', 'purple', 'ursine', 'lapis'] as const)(
+    'retains the bundled %s style when saving and loading preferences',
+    async (articleStyle) => {
+      const client = { send: vi.fn().mockResolvedValue({
+        success: true, data: { settings: { ...DEFAULT_SETTINGS, articleStyle } },
+      }) };
+      const store = createSettingsStore(client);
+      await store.getState().updateSettings({ articleStyle });
+      await store.getState().loadSettings();
+      expect(store.getState().settings.articleStyle).toBe(articleStyle);
+      expect(client.send).toHaveBeenCalledWith({ type: 'SETTINGS_UPDATE', articleStyle });
+      expect(store.getState().settings.readingFont).toBe(DEFAULT_SETTINGS.readingFont);
+    },
+  );
+
   it('persists only the article style patch and keeps the other reading preferences', async () => {
     const client = { send: vi.fn().mockResolvedValue({ success: true }) };
     const store = createSettingsStore(client);

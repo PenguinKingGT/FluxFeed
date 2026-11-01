@@ -6,6 +6,7 @@
 @import "lxgw-wenkai-lite-webfont/lxgwwenkailite-bold.css";
 
 @import "./article-styles.css";
+@import "./typora-article-styles.css";
 @import "./code-highlighting.css";
 
 @custom-variant dark (&:is(.dark *));

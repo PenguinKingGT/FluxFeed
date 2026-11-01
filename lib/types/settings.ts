@@ -1,4 +1,13 @@
-export type ArticleStyle = 'default' | 'vue' | 'github' | 'editorial' | 'minimal';
+export type ArticleStyle =
+  | 'default'
+  | 'vue'
+  | 'github'
+  | 'editorial'
+  | 'minimal'
+  | 'drake'
+  | 'purple'
+  | 'ursine'
+  | 'lapis';
 
 export type ReadingFont = 'system-serif' | 'system-sans' | 'lxgw-wenkai';
 export type InterfaceFont = 'system-sans' | 'lxgw-wenkai';

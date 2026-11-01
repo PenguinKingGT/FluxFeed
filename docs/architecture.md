@@ -92,7 +92,7 @@ AI 输出按不可信纯文本处理。任何文章 ID 导航都必须与本地�
 
 `lib/reader/article-styles.ts` 定义可用的正文样式与旧数据回退规则。`Settings.articleStyle` 通过现有后台设置消息保存；无新增索引，无数据库版本迁移。
 
-`ReadingPane` 通过 `prepareArticleContent` 按 HTML 值 memoize 当前文章，只清洗一次；`ArticleContent` 接收该安全正文并缓存代码高亮，再为正文根节点设置规范化的 `data-article-style`。`entrypoints/article-styles.css` 的规则全部限制在正文容器内；原始样式不启用新增规则。样式选择器仅放在外观设置中，阅读页应用同一份持久化偏好。切换排版只改变 CSS，不触发内容请求或 AI 调用。
+`ReadingPane` 通过 `prepareArticleContent` 按 HTML 值 memoize 当前文章，只清洗一次；`ArticleContent` 接收该安全正文并缓存代码高亮，再为正文根节点设置规范化的 `data-article-style`。`entrypoints/article-styles.css` 和 `entrypoints/typora-article-styles.css` 的规则全部限制在正文容器内；原始样式不启用新增规则。原 minimal 值现在对应 MIT 许可的 Lightmind 适配（名称已同步中英日）；Lightmind 的文档强调色和 One Dark 代码配色限定在正文容器，继续沿用阅读字体与字号偏好，许可随扩展打包。Drake、Purple、Ursine 和 Lapis 同样以白名单值提供，独立样式文件只覆盖正文；MIT 许可随扩展打包，Purple 额外提供本项目深色适配。所有正文主题均不叠加外围背景或 padding，统一复用阅读栏的画布和可用宽度；引用、代码和表格保留内容级底色及间距。样式选择器仅放在外观设置中，阅读页应用同一份持久化偏好。切换排版只改变 CSS，不触发内容请求或 AI 调用。
 
 AI 输入在面板隐藏或 AI 未配置时不提取；首次需要时从已清洗 HTML 提取纯文本，缓存字符数和分块计划。缓存只属于当前正文对象，没有跨文章的全局 Map，不长期保留已离开的长文章或 DOM。收藏、已读、摘要状态和排版偏好变化不会重新清洗、提取或分块；正文变化重建对象，隐藏后再显示可复用已计算的 AI 输入。阅读时间单独按正文和语言缓存。Unicode 计数逐码点遍历，不创建完整字符数组。后台仍独立校验消息和输入，页面缓存不替代安全校验。
 

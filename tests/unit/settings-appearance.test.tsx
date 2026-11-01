@@ -70,11 +70,14 @@ describe('AppearanceSection', () => {
     expect(screen.getByText('Large')).not.toBeNull();
   });
 
-  it('offers five article styles and saves a selection independently of fonts and app colors', async () => {
+  it('offers nine article styles and saves a selection independently of fonts and app colors', async () => {
     const updateSettings = vi.fn();
     render(<AppearanceSection settings={settings} updateSettings={updateSettings} />);
     fireEvent.click(screen.getByRole('combobox', { name: 'Article style' }));
-    expect(screen.getAllByRole('option')).toHaveLength(5);
+    expect(screen.getAllByRole('option')).toHaveLength(9);
+    for (const name of ['Drake', 'Purple', 'Ursine', 'Lapis']) {
+      expect(screen.getByRole('option', { name })).not.toBeNull();
+    }
     fireEvent.click(await screen.findByRole('option', { name: 'Vue' }));
     expect(updateSettings).toHaveBeenCalledWith({ articleStyle: 'vue' });
   });

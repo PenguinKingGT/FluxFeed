@@ -5,7 +5,12 @@ export const ARTICLE_STYLES: readonly ArticleStyle[] = [
   'vue',
   'github',
   'editorial',
+  // Keep persisted selections compatible; this slot now renders the bundled Lightmind adaptation.
   'minimal',
+  'drake',
+  'purple',
+  'ursine',
+  'lapis',
 ];
 
 /** Only bundled styles can reach the reader; old or unknown values retain its original look. */

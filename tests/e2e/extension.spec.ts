@@ -1,3 +1,4 @@
+import { expectFullArticleWidth } from './article-width-assertions';
 import { DEFAULT_SETTINGS } from '@/lib/db/defaults';
 import { expect, test } from './fixtures';
 
@@ -685,7 +686,7 @@ test('switches all five article styles independently and persists them across se
   async function chooseStyle(name: string) {
     await page.goto(`chrome-extension://${extensionId}/options.html#/settings?section=appearance`);
     await picker.click();
-    await expect(page.getByRole('option')).toHaveCount(5);
+    await expect(page.getByRole('option')).toHaveCount(9);
     await page.getByRole('option', { name, exact: true }).click();
     await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
     await page.getByRole('button', { name: /文章样式排版示例/ }).click();
@@ -701,7 +702,7 @@ test('switches all five article styles independently and persists them across se
     { id: 'vue', name: 'Vue 风格', link: 'rgb(39, 133, 92)' },
     { id: 'github', name: 'GitHub', link: 'rgb(9, 105, 218)' },
     { id: 'editorial', name: '书刊', link: 'rgb(158, 64, 82)' },
-    { id: 'minimal', name: '简约', link: 'rgb(28, 29, 26)' },
+    { id: 'minimal', name: 'Lightmind', link: 'rgb(74, 124, 89)' },
   ];
   const signatures = new Set<string>();
   for (const style of styles) {
@@ -714,6 +715,14 @@ test('switches all five article styles independently and persists them across se
     }));
     expect(tokenColors.keyword).not.toBe(tokenColors.base);
     await expect(prose.locator('a')).toHaveCSS('color', style.link);
+    if (style.id === 'minimal') {
+      await expectFullArticleWidth(prose);
+      await expect(prose.locator('h2')).toHaveCSS('color', 'rgb(47, 90, 64)');
+      await expect(prose.locator('blockquote')).toHaveCSS('border-left-width', '4px');
+      await expect(prose.locator('pre')).toHaveCSS('background-color', 'rgb(30, 35, 48)');
+      await expect(prose.locator('pre .hljs-keyword').first()).toHaveCSS('color', 'rgb(213, 95, 222)');
+      await expect(prose.locator('th').first()).toHaveCSS('background-color', 'rgb(74, 124, 89)');
+    }
     await expect(prose).toHaveCSS('font-family', font);
     await expect(page.locator('html')).toHaveAttribute('data-color-theme', appTheme!);
     expect(await prose.innerHTML()).toBe(sourceHtml);
@@ -730,15 +739,20 @@ test('switches all five article styles independently and persists them across se
   await page.getByRole('button', { name: /文章样式排版示例/ }).click();
   await expect(prose).toHaveAttribute('data-article-style', 'minimal');
   await page.goto(`chrome-extension://${extensionId}/options.html#/settings?section=appearance`);
-  await expect(page.getByRole('combobox', { name: '文章样式', exact: true })).toContainText('简约');
+  await expect(page.getByRole('combobox', { name: '文章样式', exact: true })).toContainText('Lightmind');
   await page.getByRole('group', { name: '明暗模式', exact: true }).getByLabel('深色', { exact: true }).click();
   await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
   await page.getByRole('button', { name: /文章样式排版示例/ }).click();
-  const darkLinkColors = ['rgb(235, 233, 225)', 'rgb(115, 214, 163)', 'rgb(121, 184, 255)', 'rgb(232, 163, 171)', 'rgb(235, 233, 225)'];
+  const darkLinkColors = ['rgb(235, 233, 225)', 'rgb(115, 214, 163)', 'rgb(121, 184, 255)', 'rgb(232, 163, 171)', 'rgb(127, 190, 146)'];
   for (const [index, style] of styles.entries()) {
     await chooseStyle(style.name);
     await expect(prose.locator('a')).toHaveCSS('color', darkLinkColors[index]);
-    await expect(prose.locator('pre .hljs-keyword').first()).toHaveCSS('color', 'rgb(216, 161, 233)');
+    if (style.id === 'minimal') {
+      await expectFullArticleWidth(prose);
+      await expect(prose.locator('pre')).toHaveCSS('background-color', 'rgb(20, 24, 31)');
+      await expect(prose.locator('h2')).toHaveCSS('color', 'rgb(168, 212, 182)');
+    }
+    await expect(prose.locator('pre .hljs-keyword').first()).toHaveCSS('color', style.id === 'minimal' ? 'rgb(213, 95, 222)' : 'rgb(216, 161, 233)');
     await page.screenshot({ path: extension.outputPath(`fluxfeed-article-${style.id}-dark.png`), animations: 'disabled' });
   }
   await chooseStyle('Vue 风格');
@@ -749,5 +763,14 @@ test('switches all five article styles independently and persists them across se
     await expect.poll(() => element.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
   }
   await page.screenshot({ path: extension.outputPath('fluxfeed-article-vue-mobile.png'), animations: 'disabled' });
+  await page.setViewportSize({ width: 1600, height: 1100 });
+  await chooseStyle('Lightmind');
+  await page.setViewportSize({ width: 390, height: 800 });
+  await expect.poll(() => pane.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  for (const element of [prose.locator('pre'), prose.locator('table')]) {
+    await expect.poll(() => element.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
+  }
+  await expectFullArticleWidth(prose);
+  await page.screenshot({ path: extension.outputPath('fluxfeed-article-lightmind-mobile.png'), animations: 'disabled' });
   await page.close();
 });

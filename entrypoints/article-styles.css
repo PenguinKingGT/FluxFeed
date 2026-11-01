@@ -8,6 +8,9 @@
   --article-code-surface: var(--muted);
   --article-code-text: var(--foreground);
   --article-leading: 1.75;
+  /* The reader owns page spacing; prose themes must not nest another padded paper surface. */
+  padding: 0;
+  background: transparent;
   --tw-prose-links: var(--article-link);
   --tw-prose-bullets: var(--article-link);
   --tw-prose-counters: var(--article-link);
@@ -266,44 +269,164 @@
   background: transparent;
 }
 
-/* Minimal: monochrome links, light rules and almost no container decoration. */
+/* Lightmind adaptation (MIT, SunMoonTrain): https://github.com/SunMoonTrain/LightMindTheme
+   Retain the legacy minimal setting key; isolate document colors from the application theme.
+   License: public/licenses/Lightmind-MIT.txt. Fonts and text size remain user preferences. */
 .reader-prose[data-article-style='minimal'] {
-  --article-code-surface: transparent;
-  --article-leading: 1.7;
+  --lightmind-paper: #faf7ef;
+  --lightmind-text: #2c3a32;
+  --lightmind-muted: #6b7a6f;
+  --lightmind-heading: #1f2a23;
+  --lightmind-deep: #2f5a40;
+  --lightmind-stripe: #ece8db;
+  --lightmind-inline: #e7eee5;
+  --lightmind-table-text: #faf7ef;
+  --article-link: #4a7c59;
+  --article-soft: #ecefe6;
+  --article-rule: #8fb39b;
+  --article-inline: var(--lightmind-deep);
+  --article-code-surface: #1e2330;
+  --article-code-text: #c8cfd9;
+  --article-leading: 1.8;
+  --tw-prose-body: var(--lightmind-text);
+  --tw-prose-bold: var(--lightmind-deep);
+  color: var(--lightmind-text);
 }
+
+.dark .reader-prose[data-article-style='minimal'] {
+  --lightmind-paper: #1d2622;
+  --lightmind-text: #d4dccf;
+  --lightmind-muted: #9ba89e;
+  --lightmind-heading: #e8ede1;
+  --lightmind-deep: #a8d4b6;
+  --lightmind-stripe: #232d28;
+  --lightmind-inline: #25342c;
+  --lightmind-table-text: #161d1a;
+  --article-link: #7fbe92;
+  --article-soft: #1d2722;
+  --article-rule: #5a7d68;
+  --article-code-surface: #14181f;
+}
+
 .reader-prose[data-article-style='minimal'] :is(h1, h2, h3, h4, h5, h6) {
-  font-weight: 500;
+  color: var(--lightmind-heading);
+  font-weight: 700;
+  line-height: 1.35;
+  margin-block: 1.6em 0.6em;
+  letter-spacing: 0.005em;
+}
+.reader-prose[data-article-style='minimal'] h1 {
+  font-size: 1.85em;
+  border-bottom: 2px solid var(--article-link);
+  padding-bottom: 0.35em;
+}
+.reader-prose[data-article-style='minimal'] :is(h2, h3, h4) {
+  color: var(--lightmind-deep);
+}
+.reader-prose[data-article-style='minimal'] h2 {
+  border-bottom: 1px solid color-mix(in srgb, var(--article-link) 25%, transparent);
+  padding-bottom: 0.3em;
+}
+.reader-prose[data-article-style='minimal'] h3::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 0.95em;
+  background: var(--article-link);
+  border-radius: 2px;
+  margin-inline-end: 0.55em;
+  vertical-align: -0.08em;
+}
+.reader-prose[data-article-style='minimal'] h4 {
+  font-size: 1.1em;
+}
+.reader-prose[data-article-style='minimal'] :is(h5, h6, figcaption) {
+  color: var(--lightmind-muted);
+}
+.reader-prose[data-article-style='minimal'] strong {
+  color: var(--lightmind-deep);
 }
 .reader-prose[data-article-style='minimal'] a {
-  text-decoration-color: var(--muted-foreground);
+  text-decoration-color: color-mix(in srgb, var(--article-link) 45%, transparent);
+}
+.reader-prose[data-article-style='minimal'] a:hover {
+  color: var(--lightmind-deep);
+  text-decoration-color: currentColor;
 }
 .reader-prose[data-article-style='minimal'] blockquote {
-  background: transparent;
-  border: 0;
-  border-inline-start: 1px solid var(--border);
+  color: var(--lightmind-text);
+  border: 1px solid color-mix(in srgb, var(--article-link) 18%, transparent);
+  border-inline-start: 4px solid var(--article-link);
+  border-radius: 8px;
+  padding: 0.8em 1.1em;
+  margin-block: 0.9em;
+}
+.reader-prose[data-article-style='minimal'] blockquote blockquote {
+  border-inline-start-color: var(--article-rule);
+  background: color-mix(in srgb, var(--lightmind-paper) 65%, var(--article-soft));
 }
 .reader-prose[data-article-style='minimal'] :not(pre) > code {
-  padding-inline: 0;
+  background: var(--lightmind-inline);
+  border: 1px solid color-mix(in srgb, var(--article-link) 15%, transparent);
+  border-radius: 4px;
+  padding: 0.06em 0.35em;
 }
 .reader-prose[data-article-style='minimal'] pre {
-  border: 0;
-  border-inline-start: 2px solid var(--border);
-  border-radius: 0;
+  /* Code blocks keep the upstream One Dark palette in both light and dark documents. */
+  --syntax-keyword: #d55fde;
+  --syntax-string: #89ca78;
+  --syntax-number: #d19a66;
+  --syntax-title: #61afef;
+  --syntax-attribute: #ef596f;
+  --syntax-comment: #77b767;
+  border: 1px solid #3a4253;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', var(--font-mono);
 }
-.reader-prose[data-article-style='minimal'] ul > li::marker {
-  content: '—  ';
-  color: var(--muted-foreground);
+.reader-prose[data-article-style='minimal'] pre :is(.hljs-type, .hljs-built_in, .hljs-meta) {
+  color: #e5c07b;
+}
+.reader-prose[data-article-style='minimal'] pre :is(.hljs-attr, .hljs-attribute) {
+  color: #2bbac5;
+}
+.reader-prose[data-article-style='minimal'] table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 2px solid var(--lightmind-deep);
+  border-radius: 8px;
+  background: var(--lightmind-paper);
+  font-size: 0.95em;
 }
 .reader-prose[data-article-style='minimal'] :is(th, td) {
   border: 0;
-  border-bottom: 1px solid var(--border);
-  padding-inline-start: 0;
+  border-inline-end: 1px solid color-mix(in srgb, var(--article-link) 30%, transparent);
 }
-.reader-prose[data-article-style='minimal'] :is(th, tbody tr:nth-child(even)) {
-  background: transparent;
+.reader-prose[data-article-style='minimal'] th {
+  background: var(--article-link);
+  color: var(--lightmind-table-text);
+}
+.reader-prose[data-article-style='minimal'] td {
+  border-top: 1px solid color-mix(in srgb, var(--article-link) 38%, transparent);
+}
+.reader-prose[data-article-style='minimal'] tr > :last-child {
+  border-inline-end: 0;
+}
+.reader-prose[data-article-style='minimal'] tbody tr:nth-child(even) {
+  background: var(--lightmind-stripe);
+}
+.reader-prose[data-article-style='minimal'] :is(th, td) p {
+  margin: 0;
+}
+.reader-prose[data-article-style='minimal'] hr {
+  height: 1px;
+  border: 0;
+  background: linear-gradient(to right, transparent, var(--article-rule) 30%, var(--article-rule) 70%, transparent);
 }
 .reader-prose[data-article-style='minimal'] :is(img, figure) {
-  border-radius: 0;
+  border-radius: 8px;
+}
+.reader-prose[data-article-style='minimal'] figcaption {
+  background: var(--lightmind-stripe);
 }
 
 .reader-prose.article-styled > :first-child {
