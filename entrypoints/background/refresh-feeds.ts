@@ -1,15 +1,14 @@
 import type { FetchFeedResult } from '@/lib/feed';
+import type { StorageService } from '@/lib/db/storage-service';
 import { createRecordId } from '@/lib/id';
 import type { Article, Feed, ParsedArticle } from '@/lib/types';
 
 export const REFRESH_CONCURRENCY = 5;
 
-interface RefreshStorageService {
-  getFeeds(): Promise<Feed[]>;
-  getArticleGuids(feedId: string): Promise<string[]>;
-  saveArticles(articles: Article[]): Promise<void>;
-  updateFeed(feedId: string, patch: Partial<Feed>): Promise<void>;
-}
+type RefreshStorageService = Pick<
+  StorageService,
+  'getFeeds' | 'getArticleGuids' | 'commitFeedRefresh' | 'updateFeed'
+>;
 
 export interface RefreshFeedsDependencies {
   storageService: RefreshStorageService;
@@ -39,7 +38,7 @@ export function convertParsedArticleToArticle(
   };
 }
 
-/** Fetches a feed and checks stored GUID index keys before saving new articles. */
+/** Fetches outside transactions, then commits new articles only if the feed has not been deleted. */
 export async function refreshSingleFeed(
   feed: Feed,
   dependencies: RefreshFeedsDependencies,
@@ -57,18 +56,12 @@ export async function refreshSingleFeed(
     .map((article) => convertParsedArticleToArticle(article, feed, fetchedAt))
     .filter((article) => !existingGuids.has(article.guid));
 
-  if (newArticles.length > 0) {
-    await dependencies.storageService.saveArticles(newArticles);
-  }
-
-  await dependencies.storageService.updateFeed(feed.id, {
+  return dependencies.storageService.commitFeedRefresh(feed.id, newArticles, {
     title: result.feed.title || feed.title,
     iconUrl: result.feed.iconUrl || feed.iconUrl,
     lastFetchedAt: fetchedAt,
     errorCount: 0,
   });
-
-  return newArticles.length;
 }
 
 export async function refreshAllFeeds(dependencies: RefreshFeedsDependencies): Promise<number> {

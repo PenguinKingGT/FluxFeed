@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Collection, IndexableType, PromiseExtended } from 'dexie';
 
 import { FluxFeedDatabase } from '@/lib/db/database';
 import { resetDatabase } from '@/lib/db/database-service';
@@ -48,6 +49,7 @@ describe('storage service', () => {
   const storageService = createStorageService(database);
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await resetDatabase(database);
   });
 
@@ -388,6 +390,73 @@ describe('storage service', () => {
     await storageService.pruneOldArticles(0);
 
     expect(await storageService.getArticles()).toHaveLength(2);
+  });
+
+  it.each([
+    { label: 'starred', patch: { isStarred: true } },
+    { label: 'unread', patch: { isRead: false } },
+    { label: 'recently fetched', patch: { fetchedAt: Date.now() } },
+  ])('keeps an expired candidate that becomes $label before deletion', async ({ patch }) => {
+    await storageService.saveArticles([
+      createArticle({ id: 'protected', fetchedAt: 1, isRead: true }),
+      createArticle({ id: 'removable', guid: 'other-guid', fetchedAt: 1, isRead: true }),
+    ]);
+    const readKeys: (this: Collection<unknown>) => PromiseExtended<IndexableType[]>
+      = database.Collection.prototype.primaryKeys;
+    // Complete the real candidate read, then commit the user's update before cleanup resumes.
+    vi.spyOn(database.Collection.prototype, 'primaryKeys').mockImplementationOnce(function (
+      this: Collection<unknown>,
+    ) {
+      return readKeys.call(this).then(async (keys) => {
+        await storageService.updateArticle('protected', patch);
+        return keys;
+      });
+    });
+
+    await storageService.pruneOldArticles(7);
+
+    expect(await storageService.getArticle('protected')).toMatchObject(patch);
+    expect(await storageService.getArticle('removable')).toBeUndefined();
+  });
+
+  it.each([
+    { label: 'starred', patch: { isStarred: true } },
+    { label: 'unread', patch: { isRead: false } },
+  ])('keeps an excess candidate that becomes $label before deletion', async ({ patch }) => {
+    await storageService.saveFeed(createFeed());
+    await storageService.saveArticles([
+      createArticle({ id: 'protected', publishedAt: 1, isRead: true }),
+      createArticle({ id: 'removable', guid: 'other-guid', publishedAt: 2, isRead: true }),
+      createArticle({ id: 'newest', guid: 'newest-guid', publishedAt: 3, isRead: true }),
+    ]);
+    const readArray: (this: Collection<unknown>) => PromiseExtended<unknown[]>
+      = database.Collection.prototype.toArray;
+    let changed = false;
+    // Ignore metadata reads and change the article only after its candidate snapshot is returned.
+    vi.spyOn(database.Collection.prototype, 'toArray').mockImplementation(function (
+      this: Collection<unknown>,
+    ) {
+      return readArray.call(this).then(async (records: unknown[]) => {
+        const containsCandidate = records.some((record) =>
+          typeof record === 'object'
+          && record !== null
+          && 'id' in record
+          && record.id === 'protected',
+        );
+        if (!changed && containsCandidate) {
+          changed = true;
+          await storageService.updateArticle('protected', patch);
+        }
+        return records;
+      });
+    });
+
+    await storageService.pruneExcessArticles(1);
+
+    expect(changed).toBe(true);
+    expect(await storageService.getArticle('protected')).toMatchObject(patch);
+    expect(await storageService.getArticle('removable')).toBeUndefined();
+    expect(await storageService.getArticle('newest')).toBeDefined();
   });
 
   it('limits each feed by removing its oldest read unstarred articles', async () => {

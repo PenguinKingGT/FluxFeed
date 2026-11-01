@@ -4,8 +4,11 @@ import type { FluxFeedDatabase } from './database';
 import { ensureDatabaseDefaults } from './database-service';
 import { DEFAULT_SETTINGS } from './defaults';
 import { queryArticles, type GetArticlesOptions } from './article-query';
+import { deletePrunableCandidates } from './article-pruning';
 
 export type { GetArticlesOptions } from './article-query';
+
+export type FeedRefreshPatch = Pick<Feed, 'title' | 'iconUrl' | 'lastFetchedAt' | 'errorCount'>;
 
 export interface StorageService {
   getFeed(feedId: string): Promise<Feed | undefined>;
@@ -21,6 +24,7 @@ export interface StorageService {
   getArticleGuids(feedId: string): Promise<string[]>;
   getArticle(articleId: string): Promise<Article | undefined>;
   saveArticles(articles: Article[]): Promise<void>;
+  commitFeedRefresh(feedId: string, articles: Article[], patch: FeedRefreshPatch): Promise<number>;
   updateArticle(articleId: string, patch: Partial<Article>): Promise<void>;
   bulkUpdateArticles(articleIds: string[], patch: Partial<Article>): Promise<void>;
   removeArticlesByFeed(feedId: string): Promise<void>;
@@ -192,6 +196,28 @@ export function createStorageService(database: FluxFeedDatabase): StorageService
       await database.articles.bulkPut(articles);
     },
 
+    /** Atomically saves a refresh only while its parent feed still exists; deleted feeds return zero. */
+    async commitFeedRefresh(feedId, articles, patch) {
+      if (articles.some((article) => article.feedId !== feedId)) {
+        throw new Error('Refresh articles must belong to the refreshed feed');
+      }
+
+      return database.transaction('rw', database.feeds, database.articles, async () => {
+        const feed = await database.feeds.get(feedId);
+        if (!feed) {
+          return 0;
+        }
+
+        // Feed and folder deletion use these same stores: whichever commits first
+        // wins, without leaving articles whose parent was deleted during the request.
+        if (articles.length > 0) {
+          await database.articles.bulkPut(articles);
+        }
+        await database.feeds.update(feedId, patch);
+        return articles.length;
+      });
+    },
+
     async updateArticle(articleId, patch) {
       await database.articles.update(articleId, patch);
     },
@@ -208,6 +234,7 @@ export function createStorageService(database: FluxFeedDatabase): StorageService
       await database.articles.where('feedId').equals(feedId).delete();
     },
 
+    /** Selects expired candidates, then revalidates their current protection state before deletion. */
     async pruneOldArticles(retentionDays) {
       if (retentionDays <= 0) {
         return;
@@ -218,9 +245,10 @@ export function createStorageService(database: FluxFeedDatabase): StorageService
         .filter((article) => article.fetchedAt < cutoff && article.isRead && !article.isStarred)
         .primaryKeys();
 
-      await database.articles.bulkDelete(oldArticles.map(String));
+      await deletePrunableCandidates(database, oldArticles.map(String), cutoff);
     },
 
+    /** Selects the oldest excess candidates without locking all feeds during discovery. */
     async pruneExcessArticles(maxArticlesPerFeed) {
       if (maxArticlesPerFeed <= 0) {
         return;
@@ -247,9 +275,7 @@ export function createStorageService(database: FluxFeedDatabase): StorageService
         articleIdsToDelete.push(...removable.map((article) => article.id));
       }
 
-      if (articleIdsToDelete.length > 0) {
-        await database.articles.bulkDelete(articleIdsToDelete);
-      }
+      await deletePrunableCandidates(database, articleIdsToDelete);
     },
 
     async getUnreadCount() {

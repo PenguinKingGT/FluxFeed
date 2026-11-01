@@ -27,7 +27,7 @@ describe('background refresh feeds', () => {
     const storageService = {
       getFeeds: vi.fn(),
       getArticleGuids: vi.fn().mockResolvedValue(['old-guid']),
-      saveArticles: vi.fn(),
+      commitFeedRefresh: vi.fn().mockResolvedValue(1),
       updateFeed: vi.fn(),
     };
     const fetchFeed = vi.fn().mockResolvedValue({
@@ -69,7 +69,7 @@ describe('background refresh feeds', () => {
     expect(savedCount).toBe(1);
     expect(storageService.getArticleGuids).toHaveBeenCalledWith(feed.id);
     expect(fetchFeed).toHaveBeenCalledWith(feed.url);
-    expect(storageService.saveArticles).toHaveBeenCalledWith([
+    expect(storageService.commitFeedRefresh).toHaveBeenCalledWith('feed-1', [
       expect.objectContaining({
         id: expect.stringMatching(/^[0-9a-f-]{36}$/),
         feedId: 'feed-1',
@@ -78,8 +78,7 @@ describe('background refresh feeds', () => {
         isStarred: false,
         fetchedAt: 4000,
       }),
-    ]);
-    expect(storageService.updateFeed).toHaveBeenCalledWith('feed-1', {
+    ], {
       title: 'Fresh Feed',
       iconUrl: 'https://example.com/icon.png',
       lastFetchedAt: 4000,
@@ -92,7 +91,7 @@ describe('background refresh feeds', () => {
     const storageService = {
       getFeeds: vi.fn(),
       getArticleGuids: vi.fn(),
-      saveArticles: vi.fn(),
+      commitFeedRefresh: vi.fn().mockResolvedValue(1),
       updateFeed: vi.fn(),
     };
     const fetchFeed = vi.fn().mockResolvedValue({ success: false, error: 'network' });
@@ -100,7 +99,7 @@ describe('background refresh feeds', () => {
     const savedCount = await refreshSingleFeed(feed, { storageService, fetchFeed });
 
     expect(savedCount).toBe(0);
-    expect(storageService.saveArticles).not.toHaveBeenCalled();
+    expect(storageService.commitFeedRefresh).not.toHaveBeenCalled();
     expect(storageService.updateFeed).toHaveBeenCalledWith('feed-1', { errorCount: 3 });
   });
 
@@ -109,7 +108,7 @@ describe('background refresh feeds', () => {
     const storageService = {
       getFeeds: vi.fn().mockResolvedValue(feeds),
       getArticleGuids: vi.fn().mockResolvedValue([]),
-      saveArticles: vi.fn(),
+      commitFeedRefresh: vi.fn().mockResolvedValue(1),
       updateFeed: vi.fn(),
     };
     const fetchFeed = vi.fn().mockResolvedValue({
@@ -148,7 +147,7 @@ describe('background refresh feeds', () => {
     const storageService = {
       getFeeds: vi.fn().mockResolvedValue(feeds),
       getArticleGuids: vi.fn(),
-      saveArticles: vi.fn(),
+      commitFeedRefresh: vi.fn().mockResolvedValue(1),
       updateFeed: vi.fn(),
     };
     const fetchFeed = vi.fn().mockImplementation(async () => {
