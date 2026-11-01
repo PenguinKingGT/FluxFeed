@@ -20,7 +20,7 @@ P1 表示优先修复，P2 表示随后处理，P3 表示维护性清理。S/M �
 | --- | --- | --- | --- | --- | --- | --- |
 | [x] | R01 | HTML 清洗后重新引入危险 URL | P1 | S | 低 | 已完成 |
 | [x] | R02 | 文章查询及刷新反复加载全库正文 | P1 | M | 中 | 已完成 |
-| [ ] | R03 | Chrome 后台网站地址发现依赖 DOMParser | P1 | M | 低 | 待处理 |
+| [x] | R03 | Chrome 后台网站地址发现依赖 DOMParser | P1 | M | 低 | 已完成 |
 | [ ] | R04 | 前端并发保存设置覆盖较新状态 | P2 | S | 中 | 待处理 |
 | [ ] | R05 | 后台设置读取、保存存在丢更新 | P2 | S | 低 | 待处理 |
 | [ ] | R06 | Feed 请求缺少超时、体积及发现环路限制 | P2 | M | 低 | 待处理 |
@@ -60,7 +60,7 @@ P1 表示优先修复，P2 表示随后处理，P3 表示维护性清理。S/M �
 - 修复方向：使用 Worker 可用的解析方式，或明确的离屏文档边界；优先评估无需新增权限的方案。
 - 验收：真实 Chrome 扩展中完成「网站地址 → 发现 Feed → 订阅」，同时覆盖直接 Feed 地址、无订阅链接、相对链接；验证 Firefox 构建和相关行为。
 - 依据：[Chrome Service Worker 迁移说明](https://developer.chrome.com/docs/extensions/develop/migrate/to-service-workers)。
-- 完成记录：待填写验证结果、修复提交。
+- 完成记录（2026-11-01）：改用随扩展打包的 htmlparser2 事件解析器，复用锁文件已有的 10.1.0 版本，不依赖 DOMParser/window/document，不新增权限或离屏页面。保持 RSS/Atom/JSON Feed 的候选顺序，处理相对地址、实体属性、rel token 和 MIME 大小写；无效地址及非 HTTP(S) 协议跳过，忽略注释、脚本、样式和 template 中的伪链接。新增 4 项单元测试，修复前包括无 DOM API 场景在内的 3 项失败，修复后通过；新增独立浏览器上下文 E2E，确认真实 Worker 无 DOMParser，并完成网站 URL → 相对 Feed URL → 入库阅读 → 重载持久化。`pnpm test --run`（68 个文件、343 项）、`pnpm compile`、`pnpm lint`、Chrome/Firefox 构建及 `pnpm exec playwright test`（13 项）均通过。Firefox 已完成构建，未运行 Firefox 浏览器 E2E；R06 的请求边界问题仍单独待处理。修复与本条完成记录一并提交。
 
 ## R04：前端并发保存设置覆盖较新状态
 

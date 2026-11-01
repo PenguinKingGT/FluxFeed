@@ -74,6 +74,26 @@ test.beforeAll(async () => {
       response.end('<!doctype html><title>Original article</title><p>Original article content.</p>');
       return;
     }
+    if (request.url === '/discovery/website') {
+      response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      response.end(`<!doctype html><html><head>
+        <!-- <link rel="alternate" type="application/rss+xml" href="/comment-feed"> -->
+        <link rel="alternate" type="application/rss+xml" href="http://[invalid">
+        <link rel="alternate" type="application/rss+xml" href="feed.xml?format=rss&amp;lang=en">
+        </head><body>Website with a relative feed link.</body></html>`);
+      return;
+    }
+    if (request.url === '/discovery/feed.xml?format=rss&lang=en') {
+      response.writeHead(200, { 'Content-Type': 'application/rss+xml; charset=utf-8' });
+      response.end(`<rss><channel>
+        <title>Website Discovery Feed</title>
+        <item><guid>discovered-article</guid><title>Discovered Website Article</title>
+          <link>http://127.0.0.1/article-1</link>
+          <description>Read after discovering a feed in the extension worker.</description>
+          <pubDate>Tue, 28 Jul 2026 12:00:00 GMT</pubDate>
+        </item></channel></rss>`);
+      return;
+    }
     const isLongFeed = request.url === '/long-feed.xml';
     const isReaderFeed = request.url === '/reader-feed.xml';
     const isStyleFeed = request.url === '/style-feed.xml';
@@ -160,6 +180,44 @@ test.afterAll(async () => {
     }
     fixtureServer.close((error) => error ? reject(error) : resolve());
   });
+});
+
+test('subscribes using a website URL in a DOM-free extension worker', async () => {
+  const extensionPath = path.resolve('.output/chrome-mv3');
+  // Keep discovery independent of the language, subscriptions, and settings from other tests.
+  const discoveryContext = await chromium.launchPersistentContext('', {
+    channel: 'chromium',
+    headless: true,
+    args: [
+      `--disable-extensions-except=${extensionPath}`,
+      `--load-extension=${extensionPath}`,
+    ],
+  });
+
+  try {
+    let [worker] = discoveryContext.serviceWorkers();
+    worker ??= await discoveryContext.waitForEvent('serviceworker');
+    expect(await worker.evaluate(() => typeof DOMParser)).toBe('undefined');
+    const discoveryExtensionId = new URL(worker.url()).host;
+    const page = await discoveryContext.newPage();
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto(`chrome-extension://${discoveryExtensionId}/options.html#/all`);
+    await page.getByRole('button', { name: 'Add Feed', exact: true }).click();
+    await page.getByLabel('Feed URL').fill(new URL('/discovery/website', fixtureFeedUrl).href);
+    await page.getByRole('button', { name: 'Subscribe', exact: true }).click();
+
+    const article = page.getByRole('button', { name: /Discovered Website Article/ });
+    await expect(article).toBeVisible();
+    await article.click();
+    await expect(page.getByTestId('reading-pane').getByText(
+      'Read after discovering a feed in the extension worker.',
+    )).toBeVisible();
+    await page.reload();
+    await expect(article).toBeVisible();
+    await expect(page.getByText('Website Discovery Feed', { exact: true }).first()).toBeVisible();
+  } finally {
+    await discoveryContext.close();
+  }
 });
 
 test('renders the options reader and settings hash route', async () => {

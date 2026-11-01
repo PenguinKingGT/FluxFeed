@@ -29,6 +29,8 @@
 
 ### Feed 发现与后台刷新
 
+- 添加订阅支持直接 Feed 地址，也支持从网站 HTML 中发现第一个有效的 RSS、Atom 或 JSON Feed 链接；后台发现不依赖浏览器 DOM API，兼容 Chrome MV3 Service Worker。
+- 相对地址和 HTML 属性实体正确解析；无效 URL、非 HTTP(S) 协议及注释、脚本、样式、template 中的伪链接不作为订阅候选。网站没有候选时稳定返回失败。
 - 页面发现多个 Feed 时，用户可以选择具体 Feed。
 - 每个候选 Feed 独立判断是否已经订阅。
 - 批量刷新最多同时处理 5 个 Feed。

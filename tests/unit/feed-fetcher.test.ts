@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { fetchFeed } from '@/lib/feed/feed-fetcher';
 
@@ -60,6 +60,36 @@ describe('fetchFeed', () => {
       success: false,
       error: 'Not a valid RSS/Atom/JSON feed',
     });
+  });
+
+  it('discovers a relative feed URL without any browser DOM APIs', async () => {
+    vi.stubGlobal('DOMParser', undefined);
+    vi.stubGlobal('document', undefined);
+    vi.stubGlobal('window', undefined);
+    const calls: string[] = [];
+
+    try {
+      const result = await fetchFeed('https://example.com/blog/', async (input) => {
+        calls.push(String(input));
+        if (calls.length === 1) {
+          return createResponse(`
+            <!doctype html><html><head>
+              <link rel="alternate" type="application/rss+xml" href="../rss.xml">
+            </head><body>Blog</body></html>
+          `, { contentType: 'text/html' });
+        }
+        return createResponse(rssXml);
+      });
+
+      expect(result).toMatchObject({
+        success: true,
+        resolvedUrl: 'https://example.com/rss.xml',
+        feed: { title: 'Fetched RSS' },
+      });
+      expect(calls).toEqual(['https://example.com/blog/', 'https://example.com/rss.xml']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('returns network errors', async () => {

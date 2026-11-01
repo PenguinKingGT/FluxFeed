@@ -7,6 +7,12 @@
 - IndexedDB 通过 Dexie 保存订阅、文章、目录、普通设置和今日简报。
 - `browser.storage.local` 只保存不应随普通设置返回页面的 AI API Key。
 
+## 后台 Feed 自动发现
+
+`fetchFeed` 收到 HTML 时，使用 `discoverFeedLinks` 提取候选 Feed，并继续请求第一个有效候选。发现逻辑使用随扩展打包的 `htmlparser2` 标签事件，不依赖 DOMParser、window 或 document，不构建浏览器 DOM、不执行页面脚本或加载 HTML 中的资源，因此可直接在 Chrome MV3 Service Worker 和 Firefox 后台运行，无需离屏页面或新增权限。
+
+候选按文档顺序保留 RSS、Atom、JSON Feed 的 HTTP(S) 链接；解析属性实体和相对地址，跳过无效地址及非 HTTP(S) 协议，忽略注释、脚本、样式和 template 内的伪链接。单个无效候选不阻止后续发现。内容脚本对当前已打开网页的检测继续使用现有页面 DOM。发现流程的总超时、响应体积和环路限制由 R06 单独处理。
+
 ## 文章查询与刷新查重
 
 - `lib/db/article-query.ts` 统一文章列表查询。订阅和目录查询先通过元数据索引确定订阅范围，再使用 `feedId` 索引读取对应正文，不加载无关订阅的文章。
