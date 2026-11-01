@@ -22,11 +22,10 @@ function createFeed(patch: Partial<Feed> = {}): Feed {
 }
 
 describe('background refresh feeds', () => {
-  it('saves only new articles and resets feed error state after success', async () => {
+  it('passes fetched articles to the atomic commit and returns its inserted count', async () => {
     const feed = createFeed();
     const storageService = {
       getFeeds: vi.fn(),
-      getArticleGuids: vi.fn().mockResolvedValue(['old-guid']),
       commitFeedRefresh: vi.fn().mockResolvedValue(1),
       updateFeed: vi.fn(),
     };
@@ -67,9 +66,9 @@ describe('background refresh feeds', () => {
     });
 
     expect(savedCount).toBe(1);
-    expect(storageService.getArticleGuids).toHaveBeenCalledWith(feed.id);
     expect(fetchFeed).toHaveBeenCalledWith(feed.url);
     expect(storageService.commitFeedRefresh).toHaveBeenCalledWith('feed-1', [
+      expect.objectContaining({ guid: 'old-guid' }),
       expect.objectContaining({
         id: expect.stringMatching(/^[0-9a-f-]{36}$/),
         feedId: 'feed-1',
@@ -90,7 +89,6 @@ describe('background refresh feeds', () => {
     const feed = createFeed({ errorCount: 2 });
     const storageService = {
       getFeeds: vi.fn(),
-      getArticleGuids: vi.fn(),
       commitFeedRefresh: vi.fn().mockResolvedValue(1),
       updateFeed: vi.fn(),
     };
@@ -107,7 +105,6 @@ describe('background refresh feeds', () => {
     const feeds = [createFeed({ id: 'feed-1' }), createFeed({ id: 'feed-2', url: 'https://example.org/rss' })];
     const storageService = {
       getFeeds: vi.fn().mockResolvedValue(feeds),
-      getArticleGuids: vi.fn().mockResolvedValue([]),
       commitFeedRefresh: vi.fn().mockResolvedValue(1),
       updateFeed: vi.fn(),
     };
@@ -146,7 +143,6 @@ describe('background refresh feeds', () => {
     let maximumActiveRequests = 0;
     const storageService = {
       getFeeds: vi.fn().mockResolvedValue(feeds),
-      getArticleGuids: vi.fn(),
       commitFeedRefresh: vi.fn().mockResolvedValue(1),
       updateFeed: vi.fn(),
     };

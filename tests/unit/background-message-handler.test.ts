@@ -14,7 +14,7 @@ function createStorageService() {
     moveTreeNode: vi.fn(),
     getUnreadCount: vi.fn().mockResolvedValue(3),
     getSettings: vi.fn(),
-    saveArticles: vi.fn(),
+    commitFeedRefresh: vi.fn(),
     bulkUpdateArticles: vi.fn(),
     getArticles: vi.fn(),
     updateArticle: vi.fn(),
@@ -73,13 +73,18 @@ describe('background message handler', () => {
         groupId: 'group-1',
       }),
     );
-    expect(storageService.saveArticles).toHaveBeenCalledWith([
+    expect(storageService.commitFeedRefresh).toHaveBeenCalledWith(expect.any(String), [
       expect.objectContaining({
         id: expect.stringMatching(/^[0-9a-f-]{36}$/),
         guid: 'article-1',
         fetchedAt: 2000,
       }),
-    ]);
+    ], {
+      title: 'Example Feed',
+      iconUrl: '',
+      lastFetchedAt: 2000,
+      errorCount: 0,
+    });
     expect(updateBadge).toHaveBeenCalled();
   });
 
@@ -108,7 +113,7 @@ describe('background message handler', () => {
     });
     expect(fetchFeed).not.toHaveBeenCalled();
     expect(storageService.saveFeed).not.toHaveBeenCalled();
-    expect(storageService.saveArticles).not.toHaveBeenCalled();
+    expect(storageService.commitFeedRefresh).not.toHaveBeenCalled();
   });
 
   it('marks selected articles as read and updates the badge', async () => {

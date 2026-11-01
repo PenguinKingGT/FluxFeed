@@ -27,7 +27,7 @@ interface MessageHandlerDependencies {
     | 'removeFeed'
     | 'getFeed'
     | 'getUnreadCount'
-    | 'saveArticles'
+    | 'commitFeedRefresh'
     | 'bulkUpdateArticles'
     | 'getArticles'
     | 'updateArticle'
@@ -147,6 +147,7 @@ function normalizeFeedUrl(url: string): string {
   }
 }
 
+/** Routes background operations and converts dependency failures into stable message responses. */
 export async function handleBackgroundMessage(
   input: Message | BackgroundMessage,
   dependencies: MessageHandlerDependencies,
@@ -174,8 +175,15 @@ export async function handleBackgroundMessage(
         const createdAt = dependencies.now?.() ?? Date.now();
         const feed = createFeed(result.feed, result.resolvedUrl ?? url, createdAt, groupId);
         await dependencies.storageService.saveFeed(feed);
-        await dependencies.storageService.saveArticles(
+        await dependencies.storageService.commitFeedRefresh(
+          feed.id,
           result.feed.articles.map((article) => convertParsedArticleToArticle(article, feed, createdAt)),
+          {
+            title: feed.title,
+            iconUrl: feed.iconUrl,
+            lastFetchedAt: createdAt,
+            errorCount: 0,
+          },
         );
         await dependencies.updateBadge();
 

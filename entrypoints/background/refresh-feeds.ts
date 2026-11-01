@@ -7,7 +7,7 @@ export const REFRESH_CONCURRENCY = 5;
 
 type RefreshStorageService = Pick<
   StorageService,
-  'getFeeds' | 'getArticleGuids' | 'commitFeedRefresh' | 'updateFeed'
+  'getFeeds' | 'commitFeedRefresh' | 'updateFeed'
 >;
 
 export interface RefreshFeedsDependencies {
@@ -38,7 +38,7 @@ export function convertParsedArticleToArticle(
   };
 }
 
-/** Fetches outside transactions, then commits new articles only if the feed has not been deleted. */
+/** Fetches outside transactions; storage atomically checks parent existence and GUID uniqueness. */
 export async function refreshSingleFeed(
   feed: Feed,
   dependencies: RefreshFeedsDependencies,
@@ -51,12 +51,10 @@ export async function refreshSingleFeed(
   }
 
   const fetchedAt = dependencies.now?.() ?? Date.now();
-  const existingGuids = new Set(await dependencies.storageService.getArticleGuids(feed.id));
-  const newArticles = result.feed.articles
-    .map((article) => convertParsedArticleToArticle(article, feed, fetchedAt))
-    .filter((article) => !existingGuids.has(article.guid));
+  const articles = result.feed.articles
+    .map((article) => convertParsedArticleToArticle(article, feed, fetchedAt));
 
-  return dependencies.storageService.commitFeedRefresh(feed.id, newArticles, {
+  return dependencies.storageService.commitFeedRefresh(feed.id, articles, {
     title: result.feed.title || feed.title,
     iconUrl: result.feed.iconUrl || feed.iconUrl,
     lastFetchedAt: fetchedAt,

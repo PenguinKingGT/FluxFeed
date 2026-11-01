@@ -38,6 +38,20 @@ export interface StorageService {
   removeDailyDigestsBefore(timestamp: number): Promise<void>;
 }
 
+/** Reads compound index keys only, joining the caller's transaction when one is active. */
+async function readFeedArticleGuids(database: FluxFeedDatabase, feedId: string): Promise<string[]> {
+  const keys = await database.articles.where('[feedId+guid]')
+    .between([feedId, Dexie.minKey], [feedId, Dexie.maxKey])
+    .keys();
+  return keys.map((key) => {
+    // Dexie's generic key type does not encode this compound index's shape.
+    if (!Array.isArray(key) || typeof key[1] !== 'string') {
+      throw new Error('Invalid article GUID index key');
+    }
+    return key[1];
+  });
+}
+
 export function createStorageService(database: FluxFeedDatabase): StorageService {
   return {
     async getFeed(feedId) {
@@ -176,16 +190,7 @@ export function createStorageService(database: FluxFeedDatabase): StorageService
 
     /** Reads GUIDs from compound index keys only, never materializing article bodies. */
     async getArticleGuids(feedId) {
-      const keys = await database.articles.where('[feedId+guid]')
-        .between([feedId, Dexie.minKey], [feedId, Dexie.maxKey])
-        .keys();
-      return keys.map((key) => {
-        // Dexie's generic key type does not encode this compound index's shape.
-        if (!Array.isArray(key) || typeof key[1] !== 'string') {
-          throw new Error('Invalid article GUID index key');
-        }
-        return key[1];
-      });
+      return readFeedArticleGuids(database, feedId);
     },
 
     async getArticle(articleId) {
@@ -196,7 +201,7 @@ export function createStorageService(database: FluxFeedDatabase): StorageService
       await database.articles.bulkPut(articles);
     },
 
-    /** Atomically saves a refresh only while its parent feed still exists; deleted feeds return zero. */
+    /** Atomically inserts unseen GUIDs for a live feed and returns the actual inserted count. */
     async commitFeedRefresh(feedId, articles, patch) {
       if (articles.some((article) => article.feedId !== feedId)) {
         throw new Error('Refresh articles must belong to the refreshed feed');
@@ -210,11 +215,23 @@ export function createStorageService(database: FluxFeedDatabase): StorageService
 
         // Feed and folder deletion use these same stores: whichever commits first
         // wins, without leaving articles whose parent was deleted during the request.
-        if (articles.length > 0) {
-          await database.articles.bulkPut(articles);
+        const seenGuids = new Set(await readFeedArticleGuids(database, feedId));
+        const newArticles: Article[] = [];
+        for (const article of articles) {
+          if (seenGuids.has(article.guid)) {
+            continue;
+          }
+          seenGuids.add(article.guid);
+          newArticles.push(article);
+        }
+
+        // Rechecking inside the write transaction serializes competing refreshes,
+        // including other database connections. Updating the set also deduplicates this response.
+        if (newArticles.length > 0) {
+          await database.articles.bulkAdd(newArticles);
         }
         await database.feeds.update(feedId, patch);
-        return articles.length;
+        return newArticles.length;
       });
     },
 
