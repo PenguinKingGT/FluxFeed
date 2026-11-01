@@ -32,9 +32,12 @@ const ALLOWED_TAGS = [
 
 const ALLOWED_ATTR = ['href', 'src', 'alt', 'title', 'target', 'rel', 'loading', 'class'];
 
+/** Removes feed-provided outer quotes before URL protocol validation. */
 function normalizeUrlAttribute(value: string): string {
   const trimmed = value.trim();
-  if (!trimmed) return '';
+  if (!trimmed) {
+    return '';
+  }
   const first = trimmed.charAt(0);
   const last = trimmed.charAt(trimmed.length - 1);
   if ((first === '"' && last === '"') || (first === '\'' && last === '\'')) {
@@ -43,16 +46,35 @@ function normalizeUrlAttribute(value: string): string {
   return trimmed;
 }
 
+/** Normalizes URLs in inert source content; the result still requires sanitization. */
+function normalizeContentUrls(content: DocumentFragment): void {
+  for (const element of content.querySelectorAll('a[href], img[src]')) {
+    const attribute = element.matches('a') ? 'href' : 'src';
+    const value = normalizeUrlAttribute(element.getAttribute(attribute) ?? '');
+    if (value) {
+      element.setAttribute(attribute, value);
+    } else {
+      element.removeAttribute(attribute);
+    }
+  }
+}
+
+/** Sanitizes feed HTML, validating normalized URLs before adding reader metadata. */
 export function sanitizeHtml(html: string): string {
-  const clean = DOMPurify.sanitize(html, {
+  // Template content is inert. Never attach it to the document before sanitization.
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  normalizeContentUrls(template.content);
+
+  // URL mutation after this step could turn an apparently relative URL into a dangerous scheme.
+  const content = DOMPurify.sanitize(template.content, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
+    RETURN_DOM_FRAGMENT: true,
   });
-  const template = document.createElement('template');
-  template.innerHTML = clean;
 
   // Retain only a bounded code-language hint, never feed-provided CSS classes.
-  template.content.querySelectorAll('[class]').forEach((element) => {
+  content.querySelectorAll('[class]').forEach((element) => {
     if (element.matches('pre, code')) {
       const classes = element.getAttribute('class') ?? '';
       const hint = classes.match(/(?:language-|lang-|brush:\s*)([a-z0-9+#-]{1,32})(?=[\s;]|$)/i)?.[1];
@@ -65,29 +87,17 @@ export function sanitizeHtml(html: string): string {
     element.removeAttribute('class');
   });
 
-  template.content.querySelectorAll('a[href]').forEach((link) => {
-    const href = normalizeUrlAttribute(link.getAttribute('href') ?? '');
-    if (href) {
-      link.setAttribute('href', href);
-    } else {
-      link.removeAttribute('href');
-    }
+  content.querySelectorAll('a[href]').forEach((link) => {
     link.setAttribute('target', '_blank');
     link.setAttribute('rel', 'noopener noreferrer');
   });
 
-  template.content.querySelectorAll('img[src]').forEach((image) => {
-    const src = normalizeUrlAttribute(image.getAttribute('src') ?? '');
-    if (src) {
-      image.setAttribute('src', src);
-    } else {
-      image.removeAttribute('src');
-    }
+  content.querySelectorAll('img[src]').forEach((image) => {
     image.setAttribute('loading', 'lazy');
   });
 
   const container = document.createElement('div');
-  container.append(template.content.cloneNode(true));
+  container.append(content);
 
   return container.innerHTML;
 }
