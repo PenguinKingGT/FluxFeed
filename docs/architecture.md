@@ -44,3 +44,5 @@ AI 输出按不可信纯文本处理。任何文章 ID 导航都必须与本地�
 `lib/reader/article-styles.ts` 定义可用的正文样式与旧数据回退规则。`Settings.articleStyle` 通过现有后台设置消息保存；无新增索引，无数据库版本迁移。
 
 `ArticleContent` 先清洗 Feed HTML，再为正文根节点设置规范化的 `data-article-style`。`entrypoints/article-styles.css` 的规则全部限制在正文容器内；原始样式不启用新增规则。样式选择器仅放在外观设置中，阅读页应用同一份持久化偏好。切换排版只改变 CSS，不触发内容请求或 AI 调用。
+
+代码高亮只在文章展示模块运行。`highlight-code.ts` 对清洗后的代码纯文本调用 Highlight.js，再次清洗生成标记；通用 HTML 清洗与后台文本提取不依赖高亮库。语言语法在扩展内按需打包，识别工作量有字符与块数上限。

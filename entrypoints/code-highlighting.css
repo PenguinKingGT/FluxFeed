@@ -1,0 +1,44 @@
+/* Token colors only: document themes continue to own code block layout and backgrounds. */
+.reader-prose {
+  --syntax-keyword: #993a9e;
+  --syntax-string: #23784b;
+  --syntax-number: #9b4c0b;
+  --syntax-title: #205da6;
+  --syntax-attribute: #8b5c16;
+  --syntax-comment: #66717b;
+}
+
+.dark .reader-prose,
+.reader-prose:not(.article-styled) pre {
+  --syntax-keyword: #d8a1e9;
+  --syntax-string: #98d6a4;
+  --syntax-number: #f0b780;
+  --syntax-title: #93c7f5;
+  --syntax-attribute: #ebcc88;
+  --syntax-comment: #a3adb6;
+}
+
+.reader-prose pre :is(.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-meta) {
+  color: var(--syntax-keyword);
+}
+
+.reader-prose pre :is(.hljs-string, .hljs-regexp, .hljs-addition) {
+  color: var(--syntax-string);
+}
+
+.reader-prose pre :is(.hljs-number, .hljs-symbol, .hljs-bullet) {
+  color: var(--syntax-number);
+}
+
+.reader-prose pre :is(.hljs-title, .hljs-built_in, .hljs-type, .hljs-selector-class, .hljs-selector-id) {
+  color: var(--syntax-title);
+}
+
+.reader-prose pre :is(.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-name) {
+  color: var(--syntax-attribute);
+}
+
+.reader-prose pre :is(.hljs-comment, .hljs-quote) {
+  color: var(--syntax-comment);
+  font-style: italic;
+}

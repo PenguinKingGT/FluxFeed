@@ -30,7 +30,7 @@ const ALLOWED_TAGS = [
   'td',
 ];
 
-const ALLOWED_ATTR = ['href', 'src', 'alt', 'title', 'target', 'rel', 'loading'];
+const ALLOWED_ATTR = ['href', 'src', 'alt', 'title', 'target', 'rel', 'loading', 'class'];
 
 function normalizeUrlAttribute(value: string): string {
   const trimmed = value.trim();
@@ -50,6 +50,20 @@ export function sanitizeHtml(html: string): string {
   });
   const template = document.createElement('template');
   template.innerHTML = clean;
+
+  // Retain only a bounded code-language hint, never feed-provided CSS classes.
+  template.content.querySelectorAll('[class]').forEach((element) => {
+    if (element.matches('pre, code')) {
+      const classes = element.getAttribute('class') ?? '';
+      const hint = classes.match(/(?:language-|lang-|brush:\s*)([a-z0-9+#-]{1,32})(?=[\s;]|$)/i)?.[1];
+      if (/(?:^|\s)(?:nohighlight|no-highlight|plain|plaintext|text)(?:\s|$)/i.test(classes)) {
+        element.setAttribute('data-code-language', 'plaintext');
+      } else if (hint) {
+        element.setAttribute('data-code-language', hint.toLowerCase());
+      }
+    }
+    element.removeAttribute('class');
+  });
 
   template.content.querySelectorAll('a[href]').forEach((link) => {
     const href = normalizeUrlAttribute(link.getAttribute('href') ?? '');

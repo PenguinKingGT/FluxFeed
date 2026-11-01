@@ -133,7 +133,7 @@ describe('Reader ReadingPane', () => {
     expect(screen.getByText(/min read/)).not.toBeNull();
     expect(screen.getByText('Safe text')).not.toBeNull();
     expect(document.body.innerHTML).not.toContain('<script>');
-    expect(screen.getByText('const x = 1')).not.toBeNull();
+    expect(document.querySelector('.reader-prose pre code')?.textContent).toBe('const x = 1');
     const articleContent = screen.getByText('Safe text').closest('.reader-prose') as HTMLElement;
     expect(articleContent.className).toContain('dark:prose-invert');
     expect(articleContent.className).not.toContain('prose-lg');

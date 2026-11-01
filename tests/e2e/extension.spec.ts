@@ -787,6 +787,12 @@ test('switches all five article styles independently and persists them across se
   for (const style of styles) {
     await chooseStyle(style.name);
     await expect(prose).toHaveAttribute('data-article-style', style.id);
+    await expect(prose.locator('pre .hljs-keyword').first()).toHaveText('function');
+    const tokenColors = await prose.locator('pre').evaluate((element) => ({
+      base: getComputedStyle(element).color,
+      keyword: getComputedStyle(element.querySelector('.hljs-keyword')!).color,
+    }));
+    expect(tokenColors.keyword).not.toBe(tokenColors.base);
     await expect(prose.locator('a')).toHaveCSS('color', style.link);
     await expect(prose).toHaveCSS('font-family', font);
     await expect(page.locator('html')).toHaveAttribute('data-color-theme', appTheme!);
@@ -812,6 +818,7 @@ test('switches all five article styles independently and persists them across se
   for (const [index, style] of styles.entries()) {
     await chooseStyle(style.name);
     await expect(prose.locator('a')).toHaveCSS('color', darkLinkColors[index]);
+    await expect(prose.locator('pre .hljs-keyword').first()).toHaveCSS('color', 'rgb(216, 161, 233)');
     await page.screenshot({ path: `/tmp/fluxfeed-article-${style.id}-dark.png`, animations: 'disabled' });
   }
   await chooseStyle('Vue 风格');

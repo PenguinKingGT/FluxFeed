@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { highlightArticleCode } from '@/lib/reader/highlight-code';
 import { cn } from '@/lib/utils';
 import { normalizeArticleStyle } from '@/lib/reader/article-styles';
 import type { Settings } from '@/lib/types';
@@ -12,7 +13,7 @@ interface ArticleContentProps {
 
 /** Applies a bundled prose style to sanitized HTML without changing app colors or reading fonts. */
 export function ArticleContent({ html, settings }: ArticleContentProps) {
-  const cleanHtml = useMemo(() => sanitizeHtml(html), [html]);
+  const cleanHtml = useMemo(() => highlightArticleCode(sanitizeHtml(html)), [html]);
   const articleStyle = normalizeArticleStyle(settings.articleStyle);
 
   return (
