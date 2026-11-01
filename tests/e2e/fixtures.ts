@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { chromium, expect, test as base, type BrowserContext, type Worker } from '@playwright/test';
-import type { Message, MessageResponse, Settings } from '@/lib/types';
+import type { Message, MessageResponse, SettingsPatch } from '@/lib/types';
 import { startFixtureServer, type FixtureServer } from './fixture-server';
 
 // This declaration describes the real Chrome runtime inside page.evaluate, not a mock.
@@ -14,7 +14,7 @@ interface ExtensionFixture {
   context: BrowserContext;
   extensionId: string;
   worker: Worker;
-  configureSettings(patch: Partial<Settings>): Promise<void>;
+  configureSettings(patch: SettingsPatch): Promise<void>;
   addFeed(relativePath?: string): Promise<void>;
   outputPath(filename: string): string;
 }

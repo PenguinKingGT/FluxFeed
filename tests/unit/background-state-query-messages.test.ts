@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handleBackgroundMessage } from '@/entrypoints/background/message-handler';
+import { DEFAULT_SETTINGS } from '@/lib/db/defaults';
 
 function createDependencies(storageService: Record<string, unknown>) {
   return {
@@ -98,7 +99,8 @@ describe('background state query messages', () => {
   });
 
   it('normalizes settings update payload fields', async () => {
-    const saveSettings = vi.fn();
+    const saved = { ...DEFAULT_SETTINGS, theme: 'dark' as const };
+    const saveSettings = vi.fn().mockResolvedValue(saved);
 
     const response = await handleBackgroundMessage(
       { type: 'SETTINGS_UPDATE', theme: 'dark', refreshInterval: 60 },
@@ -106,6 +108,6 @@ describe('background state query messages', () => {
     );
 
     expect(saveSettings).toHaveBeenCalledWith({ theme: 'dark', refreshInterval: 60 });
-    expect(response).toEqual({ success: true });
+    expect(response).toEqual({ success: true, data: { settings: saved } });
   });
 });

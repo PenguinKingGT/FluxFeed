@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AiSection } from '@/components/settings/AiSection';
 import type { Settings } from '@/lib/types';
+import { mergeSettings } from '@/lib/settings/settings-values';
 
 const { send } = vi.hoisted(() => ({ send: vi.fn() }));
 
@@ -41,7 +42,7 @@ function StatefulAiSettings() {
   return (
     <AiSection
       settings={current}
-      updateSettings={(patch) => setCurrent((previous) => ({ ...previous, ...patch }))}
+      updateSettings={(patch) => setCurrent((previous) => mergeSettings(previous, patch))}
     />
   );
 }
@@ -61,11 +62,23 @@ describe('AiSection', () => {
 
     fireEvent.click(screen.getByRole('switch', { name: 'Summarize on open' }));
     expect(updateSettings).toHaveBeenCalledWith({
-      ai: { ...settings.ai, autoSummarizeOnOpen: true },
+      ai: { autoSummarizeOnOpen: true },
     });
 
     const minimum = screen.getByRole('spinbutton', { name: 'Minimum article length' });
     expect((minimum as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it('emits independent AI field patches even before the parent rerenders', async () => {
+    send.mockResolvedValue({ success: true, data: { hasApiKey: false } });
+    const updateSettings = vi.fn();
+    render(<AiSection settings={settings} updateSettings={updateSettings} />);
+
+    fireEvent.change(screen.getByLabelText('API URL'), { target: { value: 'https://new.example.com/v1' } });
+    fireEvent.change(screen.getByLabelText('Model', { exact: true }), { target: { value: 'new-model' } });
+
+    expect(updateSettings).toHaveBeenNthCalledWith(1, { ai: { apiUrl: 'https://new.example.com/v1' } });
+    expect(updateSettings).toHaveBeenNthCalledWith(2, { ai: { model: 'new-model' } });
   });
 
   it('defaults legacy summary visibility to on and preserves other preferences when toggled', async () => {

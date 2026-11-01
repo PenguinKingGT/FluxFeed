@@ -4,7 +4,7 @@ import type { Collection, IndexableType, PromiseExtended } from 'dexie';
 import { FluxFeedDatabase } from '@/lib/db/database';
 import { resetDatabase } from '@/lib/db/database-service';
 import { createStorageService } from '@/lib/db/storage-service';
-import type { Article, Feed, Group } from '@/lib/types';
+import type { Article, Feed, Group, Settings } from '@/lib/types';
 
 const createFeed = (overrides: Partial<Feed> = {}): Feed => ({
   id: 'feed-1',
@@ -493,5 +493,72 @@ describe('storage service', () => {
       refreshInterval: 15,
       showUnreadOnly: true,
     });
+  });
+
+  it('does not persist or rewrite settings when reading defaults', async () => {
+    expect(await storageService.getSettings()).toMatchObject({ id: 'global', theme: 'system' });
+    expect(await database.settings.get('global')).toBeUndefined();
+
+    await storageService.saveSettings({ theme: 'dark' });
+    const put = vi.spyOn(database.settings, 'put');
+    expect((await storageService.getSettings()).theme).toBe('dark');
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it.each(['same connection', 'separate connections'])('retains concurrent partial saves on %s', async (mode) => {
+    const peerDatabase = new FluxFeedDatabase();
+    const peer = mode === 'same connection' ? storageService : createStorageService(peerDatabase);
+    try {
+      await storageService.saveSettings({ theme: 'light' });
+      await Promise.all([
+        storageService.saveSettings({ theme: 'dark' }),
+        peer.saveSettings({ colorTheme: 'forest' }),
+      ]);
+
+      expect(await storageService.getSettings()).toMatchObject({ theme: 'dark', colorTheme: 'forest' });
+    } finally {
+      peerDatabase.close();
+    }
+  });
+
+  it('merges and normalizes concurrent AI field patches without losing saved preferences', async () => {
+    await storageService.saveSettings({ ai: { customInstructions: 'Keep this preference' } });
+
+    await Promise.all([
+      storageService.saveSettings({ ai: { model: ' reader-model ' } }),
+      storageService.saveSettings({ ai: { apiUrl: ' https://example.com/v1 ' } }),
+    ]);
+
+    expect((await storageService.getSettings()).ai).toMatchObject({
+      model: 'reader-model',
+      apiUrl: 'https://example.com/v1',
+      customInstructions: 'Keep this preference',
+      autoSummarizeMinCharacters: 1000,
+    });
+  });
+
+  it('supplies missing legacy defaults without rewriting the legacy record', async () => {
+    const legacy = { id: 'global', theme: 'dark', ai: { model: 'legacy-model' } };
+    // Deliberately simulate an old persisted schema that predates the current required fields.
+    await database.settings.put(legacy as Settings);
+
+    expect(await storageService.getSettings()).toMatchObject({
+      theme: 'dark',
+      language: 'en',
+      ai: { model: 'legacy-model', apiUrl: '', autoSummarizeMinCharacters: 1000 },
+    });
+    expect(await database.settings.get('global')).toEqual(legacy);
+  });
+
+  it('does not lose an update interleaved with ordinary settings reads', async () => {
+    await storageService.saveSettings({ theme: 'light' });
+
+    await Promise.all([
+      storageService.getSettings(),
+      storageService.saveSettings({ theme: 'dark' }),
+      storageService.getSettings(),
+    ]);
+
+    expect((await storageService.getSettings()).theme).toBe('dark');
   });
 });

@@ -1,5 +1,5 @@
 import type { DetectedFeed } from '@/lib/content/content-detector';
-import type { Settings } from './settings';
+import type { SettingsPatch } from './settings';
 
 export type MessageAction =
   | 'FEED_ADD'
@@ -47,7 +47,7 @@ export type BackgroundMessage =
   | { type: 'MARK_ALL_READ'; feedId?: string }
   | { type: 'STAR_ARTICLE'; articleId: string; starred: boolean }
   | { type: 'GET_UNREAD_COUNT' }
-  | ({ type: 'SETTINGS_UPDATE' } & Partial<Settings>)
+  | ({ type: 'SETTINGS_UPDATE' } & SettingsPatch)
   | { type: 'FEEDS_DETECTED'; feeds: DetectedFeed[]; pageUrl: string; pageTitle: string }
   | { type: 'GET_DETECTED_FEEDS' };
 

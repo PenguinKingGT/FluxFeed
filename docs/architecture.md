@@ -7,6 +7,14 @@
 - IndexedDB 通过 Dexie 保存订阅、文章、目录、普通设置和今日简报。
 - `browser.storage.local` 只保存不应随普通设置返回页面的 AI API Key。
 
+## 设置读写与确认
+
+- `lib/settings/settings-values.ts` 补齐旧设置的默认字段，并按 `SettingsPatch` 合并顶层和嵌套 AI 字段。AI 表单只发送变化字段，不发送从旧 props 展开的整份配置；完整旧消息仍可作为完整 patch 处理。
+- 普通设置读取不写数据库；缺失字段只在返回视图中补齐。初始化仅在 settings 写事务内创建不存在的 global 记录，已存在记录保持原样，无 schema 迁移。
+- `saveSettings` 在 settings 写事务内读取最新值、合并 patch、规范化合并后的 AI 偏好并持久化，避免同连接或不同连接的部分更新相互覆盖。`SETTINGS_UPDATE` 成功响应在 data.settings 中返回实际保存值，不包含专用凭据。
+- 每个入口的 settings Store 按调用顺序串行执行加载、保存和界面偏好应用，避免响应乱序或异步语言切换覆盖较新请求。只有成功确认后才更新共享设置状态；旧的无数据成功回执兼容为对最新确认状态合并 patch。加载失败保留确认值，保存失败不应用失败 patch，后续操作可继续并清除旧错误。
+- AI 文本框在编辑过程中保留本地草稿，避免保存回执的 trim 或延迟覆盖正在输入的字符、空格；失焦后展示当前确认值，供应商切换重置对应草稿。该草稿不是持久设置，也不包含 API Key。
+
 ## 后台 Feed 自动发现
 
 `fetchFeed` 收到 HTML 时，使用 `discoverFeedLinks` 提取候选 Feed，并继续请求第一个有效候选。发现逻辑使用随扩展打包的 `htmlparser2` 标签事件，不依赖 DOMParser、window 或 document，不构建浏览器 DOM、不执行页面脚本或加载 HTML 中的资源，因此可直接在 Chrome MV3 Service Worker 和 Firefox 后台运行，无需离屏页面或新增权限。

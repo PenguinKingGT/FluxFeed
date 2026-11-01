@@ -17,6 +17,7 @@ FluxFeed 使用用户自备的 OpenAI-compatible、Gemini 或 Claude 服务，�
 
 ## 实现与兼容性
 
+- AI 偏好按变化字段更新，后台在设置事务内与最新完整配置合并后规范化；不从旧界面快照覆盖其他字段。地址、模型及指令文本框保留输入草稿，避免异步保存或 trim 破坏逐字输入与空格；失焦后显示确认值。API Key 继续使用独立凭据通道。
 - 使用 Vercel AI SDK 的 `@ai-sdk/openai-compatible`、`@ai-sdk/google` 和 `@ai-sdk/anthropic`，Gemini 和 Claude 直接使用各自原生协议。
 - Gemini 默认基础地址为 `https://generativelanguage.googleapis.com/v1beta`，Claude 为 `https://api.anthropic.com/v1`；留空使用默认值，可覆盖为代理基础地址。兼容服务仍支持基础地址或完整 endpoint。
 - 切换供应商重置当前地址和模型；当前只有一套活动配置，API Key 按供应商分别保存，切换不会复用其他供应商的 Key。

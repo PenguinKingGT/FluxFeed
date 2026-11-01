@@ -110,6 +110,155 @@ describe('settings store', () => {
     expect(store.getState().error).toBe('storage unavailable');
   });
 
+  it('serializes rapid saves and retains both changed fields', async () => {
+    let finishFirst = () => {};
+    const firstReply = new Promise<{ success: boolean }>((resolve) => {
+      finishFirst = () => resolve({ success: true });
+    });
+    const client = {
+      send: vi.fn().mockReturnValueOnce(firstReply).mockResolvedValue({ success: true }),
+    };
+    const store = createSettingsStore(client);
+    const first = store.getState().updateSettings({ theme: 'dark' });
+    const second = store.getState().updateSettings({ fontSize: 'large' });
+    await Promise.resolve();
+
+    expect(client.send).toHaveBeenCalledTimes(1);
+    finishFirst();
+    await Promise.all([first, second]);
+
+    expect(store.getState().settings).toMatchObject({ theme: 'dark', fontSize: 'large' });
+    expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+
+  it('does not let an earlier load overwrite a later requested save', async () => {
+    let finishLoad = () => {};
+    const loading = new Promise((resolve) => {
+      finishLoad = () => resolve({ success: true, data: { settings: DEFAULT_SETTINGS } });
+    });
+    const client = {
+      send: vi.fn().mockReturnValueOnce(loading).mockResolvedValue({ success: true }),
+    };
+    const store = createSettingsStore(client);
+    const load = store.getState().loadSettings();
+    const save = store.getState().updateSettings({ theme: 'dark' });
+    await Promise.resolve();
+    expect(client.send).toHaveBeenCalledTimes(1);
+
+    finishLoad();
+    await Promise.all([load, save]);
+
+    expect(store.getState().settings.theme).toBe('dark');
+    expect(store.getState().isLoading).toBe(false);
+  });
+
+  it('retains the latest value when the same field changes rapidly', async () => {
+    const client = { send: vi.fn().mockResolvedValue({ success: true }) };
+    const store = createSettingsStore(client);
+
+    await Promise.all([
+      store.getState().updateSettings({ language: 'ja' }),
+      store.getState().updateSettings({ language: 'zh-CN' }),
+    ]);
+
+    expect(store.getState().settings.language).toBe('zh-CN');
+    expect(document.documentElement.lang).toBe('zh-CN');
+    expect(i18n.language).toBe('zh-CN');
+  });
+
+  it('keeps confirmed preferences when reloading fails', async () => {
+    const client = {
+      send: vi.fn().mockResolvedValueOnce({ success: true })
+        .mockResolvedValueOnce({ success: false, error: 'offline' }),
+    };
+    const store = createSettingsStore(client);
+    await store.getState().updateSettings({ theme: 'dark' });
+
+    await store.getState().loadSettings();
+
+    expect(store.getState().settings.theme).toBe('dark');
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(store.getState().error).toBe('offline');
+    expect(store.getState().isLoading).toBe(false);
+  });
+
+  it('recovers the queue and clears an old error after a successful retry', async () => {
+    const client = {
+      send: vi.fn().mockRejectedValueOnce(new Error('runtime unavailable'))
+        .mockResolvedValue({ success: true }),
+    };
+    const store = createSettingsStore(client);
+
+    await store.getState().updateSettings({ theme: 'dark' });
+    expect(store.getState().settings.theme).toBe(DEFAULT_SETTINGS.theme);
+    await store.getState().updateSettings({ theme: 'dark' });
+
+    expect(store.getState().settings.theme).toBe('dark');
+    expect(store.getState().error).toBeNull();
+  });
+
+  it('ends loading after a rejected read and still processes a later save', async () => {
+    const client = {
+      send: vi.fn().mockRejectedValueOnce(new Error('read unavailable'))
+        .mockResolvedValue({ success: true }),
+    };
+    const store = createSettingsStore(client);
+
+    await store.getState().loadSettings();
+    expect(store.getState().isLoading).toBe(false);
+    await store.getState().updateSettings({ theme: 'dark' });
+
+    expect(store.getState().settings.theme).toBe('dark');
+    expect(store.getState().error).toBeNull();
+  });
+
+  it('uses canonical saved values returned by the background', async () => {
+    const saved = { ...DEFAULT_SETTINGS, ai: { ...DEFAULT_SETTINGS.ai, model: 'trimmed-model' } };
+    const client = { send: vi.fn().mockResolvedValue({ success: true, data: { settings: saved } }) };
+    const store = createSettingsStore(client);
+
+    await store.getState().updateSettings({ ai: { ...DEFAULT_SETTINGS.ai, model: ' trimmed-model ' } });
+
+    expect(store.getState().settings.ai.model).toBe('trimmed-model');
+  });
+
+  it('merges consecutive partial AI changes and sends only changed fields', async () => {
+    const client = { send: vi.fn().mockResolvedValue({ success: true }) };
+    const store = createSettingsStore(client);
+
+    await Promise.all([
+      store.getState().updateSettings({ ai: { model: 'reader-model' } }),
+      store.getState().updateSettings({ ai: { apiUrl: 'https://example.com/v1' } }),
+    ]);
+
+    expect(store.getState().settings.ai).toMatchObject({
+      model: 'reader-model',
+      apiUrl: 'https://example.com/v1',
+      autoSummarizeMinCharacters: 1000,
+    });
+    expect(client.send).toHaveBeenLastCalledWith({
+      type: 'SETTINGS_UPDATE',
+      ai: { apiUrl: 'https://example.com/v1' },
+    });
+  });
+
+  it('does not carry a failed AI edit into a later successful field update', async () => {
+    const client = {
+      send: vi.fn().mockResolvedValueOnce({ success: false, error: 'save failed' })
+        .mockResolvedValue({ success: true }),
+    };
+    const store = createSettingsStore(client);
+
+    await Promise.all([
+      store.getState().updateSettings({ ai: { model: 'failed-model' } }),
+      store.getState().updateSettings({ ai: { apiUrl: 'https://example.com/v1' } }),
+    ]);
+
+    expect(store.getState().settings.ai.model).toBe('');
+    expect(store.getState().settings.ai.apiUrl).toBe('https://example.com/v1');
+    expect(store.getState().error).toBeNull();
+  });
+
   it('loads legacy settings with English and switches language immediately', async () => {
     const {
       language: _language,
@@ -119,10 +268,10 @@ describe('settings store', () => {
       ...legacySettings
     } = DEFAULT_SETTINGS;
     const client = {
-      send: vi.fn().mockResolvedValue({
+      send: vi.fn().mockResolvedValueOnce({
         success: true,
         data: { settings: legacySettings },
-      }),
+      }).mockResolvedValue({ success: true }),
     };
     const store = createSettingsStore(client);
 

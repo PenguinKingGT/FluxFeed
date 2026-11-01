@@ -1,8 +1,8 @@
 import Dexie from 'dexie';
-import type { Article, DailyDigest, Feed, Group, Settings, TreeNodeMove } from '@/lib/types';
+import type { Article, DailyDigest, Feed, Group, Settings, SettingsPatch, TreeNodeMove } from '@/lib/types';
 import type { FluxFeedDatabase } from './database';
-import { ensureDatabaseDefaults } from './database-service';
-import { DEFAULT_SETTINGS } from './defaults';
+import { mergeSettings } from '@/lib/settings/settings-values';
+import { sanitizeAiPreferences } from '@/lib/ai/ai-preferences';
 import { queryArticles, type GetArticlesOptions } from './article-query';
 import { deletePrunableCandidates } from './article-pruning';
 
@@ -32,7 +32,7 @@ export interface StorageService {
   pruneExcessArticles(maxArticlesPerFeed: number): Promise<void>;
   getUnreadCount(): Promise<number>;
   getSettings(): Promise<Settings>;
-  saveSettings(settings: Partial<Settings>): Promise<void>;
+  saveSettings(settings: SettingsPatch): Promise<Settings>;
   getDailyDigest(id: string): Promise<DailyDigest | undefined>;
   saveDailyDigest(digest: DailyDigest): Promise<void>;
   removeDailyDigestsBefore(timestamp: number): Promise<void>;
@@ -299,23 +299,21 @@ export function createStorageService(database: FluxFeedDatabase): StorageService
       return database.articles.filter((article) => !article.isRead).count();
     },
 
+    /** Reads a default-completed view without persisting or overwriting stored preferences. */
     async getSettings() {
-      await ensureDatabaseDefaults(database);
-
-      return {
-        ...DEFAULT_SETTINGS,
-        ...await database.settings.get('global'),
-        id: 'global',
-      };
+      return mergeSettings(await database.settings.get('global'));
     },
 
-    async saveSettings(settings) {
-      const currentSettings = await this.getSettings();
-
-      await database.settings.put({
-        ...currentSettings,
-        ...settings,
-        id: 'global',
+    /** Merges a patch against the latest record atomically, returning the canonical saved values. */
+    async saveSettings(patch) {
+      return database.transaction('rw', database.settings, async () => {
+        const settings = mergeSettings(await database.settings.get('global'), patch);
+        if (patch.ai) {
+          // Normalize only after merging so a partial AI patch cannot reset unrelated fields.
+          settings.ai = sanitizeAiPreferences(settings.ai);
+        }
+        await database.settings.put(settings);
+        return settings;
       });
     },
 

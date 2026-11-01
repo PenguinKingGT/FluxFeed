@@ -1,18 +1,12 @@
 import type { FluxFeedDatabase } from './database';
 import { DEFAULT_SETTINGS } from './defaults';
 
+/** Initializes a missing record atomically; existing preferences must never be rewritten by reads. */
 export async function ensureDatabaseDefaults(database: FluxFeedDatabase): Promise<void> {
-  const settings = await database.settings.get('global');
-
-  if (!settings) {
-    await database.settings.put(DEFAULT_SETTINGS);
-    return;
-  }
-
-  await database.settings.put({
-    ...DEFAULT_SETTINGS,
-    ...settings,
-    id: 'global',
+  await database.transaction('rw', database.settings, async () => {
+    if (!await database.settings.get('global')) {
+      await database.settings.add(DEFAULT_SETTINGS);
+    }
   });
 }
 

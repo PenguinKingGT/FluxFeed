@@ -36,4 +36,5 @@ export type {
   InterfaceFont,
   ReadingFont,
   Settings,
+  SettingsPatch,
 } from './settings';

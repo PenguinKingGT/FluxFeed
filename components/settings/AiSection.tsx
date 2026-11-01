@@ -7,16 +7,16 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { isAiConfigured } from '@/lib/ai/ai-preferences';
 import { AI_PROVIDERS, AI_PROVIDER_BASE_URLS, normalizeAiProvider } from '@/lib/ai/provider-settings';
 import { AiCredentialControls } from './AiCredentialControls';
-import { Textarea } from '@/components/ui/textarea';
-import type { AiPreferences, Settings } from '@/lib/types';
+import type { AiPreferences, Settings, SettingsPatch } from '@/lib/types';
 import { messageClient } from '@/store/message-client';
 import { SectionHeader } from './SectionHeader';
 import { SettingRow } from './SettingRow';
 import { SettingsToggle } from './SettingsToggle';
+import { SettingsTextField } from './SettingsTextField';
 
 interface AiSectionProps {
   settings: Settings;
-  updateSettings: (patch: Partial<Settings>) => Promise<void> | void;
+  updateSettings: (patch: SettingsPatch) => Promise<void> | void;
 }
 
 /** Configures one active provider without exposing saved credentials. */
@@ -30,9 +30,9 @@ export function AiSection({ settings, updateSettings }: AiSectionProps) {
   const [testedConfiguration, setTestedConfiguration] = useState('');
   const visibleTestState = testedConfiguration === configuration ? testState : 'idle';
 
-  /** Keeps preferences in the ordinary settings channel, separate from credentials. */
+  /** Sends only changed preferences so stale rendered props cannot overwrite other pending edits. */
   function updateAi(patch: Partial<AiPreferences>) {
-    void updateSettings({ ai: { ...ai, ...patch } });
+    void updateSettings({ ai: patch });
   }
 
   /** Resets endpoint/model so a previous provider's configuration is never reused silently. */
@@ -85,26 +85,28 @@ export function AiSection({ settings, updateSettings }: AiSectionProps) {
               ? 'settings.aiApiUrlDescription'
               : 'settings.aiNativeUrlDescription')}
           </p>
-          <Input
+          <SettingsTextField
+            key={`${provider}:apiUrl`}
             id="ai-api-url"
             aria-label={t('settings.aiApiUrl')}
             className="h-10"
             placeholder={AI_PROVIDER_BASE_URLS[provider] || 'https://example.com/v1/chat/completions'}
             value={ai.apiUrl}
-            onChange={(event) => updateAi({ apiUrl: event.target.value })}
+            onValueChange={(value) => updateAi({ apiUrl: value })}
           />
         </div>
 
         <div className="border-b border-border/70 py-5">
           <label className="mb-1 block text-sm font-semibold text-foreground" htmlFor="ai-model">{t('settings.aiModel')}</label>
           <p className="mb-3 text-xs leading-5 text-muted-foreground">{t('settings.aiModelDescription')}</p>
-          <Input
+          <SettingsTextField
+            key={`${provider}:model`}
             id="ai-model"
             aria-label={t('settings.aiModel')}
             className="h-10"
             placeholder="model-name"
             value={ai.model}
-            onChange={(event) => updateAi({ model: event.target.value })}
+            onValueChange={(value) => updateAi({ model: value })}
           />
         </div>
 
@@ -130,13 +132,15 @@ export function AiSection({ settings, updateSettings }: AiSectionProps) {
         <div className="border-b border-border/70 py-5">
           <label className="mb-1 block text-sm font-semibold text-foreground" htmlFor="ai-instructions">{t('settings.aiInstructions')}</label>
           <p className="mb-3 text-xs leading-5 text-muted-foreground">{t('settings.aiInstructionsDescription')}</p>
-          <Textarea
+          <SettingsTextField
+            key={`${provider}:instructions`}
+            multiline
             id="ai-instructions"
             aria-label={t('settings.aiInstructions')}
             maxLength={2000}
             className="min-h-24"
             value={ai.customInstructions}
-            onChange={(event) => updateAi({ customInstructions: event.target.value })}
+            onValueChange={(value) => updateAi({ customInstructions: value })}
           />
         </div>
 

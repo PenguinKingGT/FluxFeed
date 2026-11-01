@@ -1,6 +1,5 @@
 import type { StorageService } from '@/lib/db';
 import type { AiModule } from '@/lib/ai/ai-module';
-import { sanitizeAiPreferences } from '@/lib/ai/ai-preferences';
 import type { FetchFeedResult } from '@/lib/feed';
 import { createRecordId } from '@/lib/id';
 import type {
@@ -10,7 +9,7 @@ import type {
   MessageAction,
   MessageResponse,
   ParsedFeed,
-  Settings,
+  SettingsPatch,
   TreeNodeMove,
 } from '@/lib/types';
 import { convertParsedArticleToArticle } from './refresh-feeds';
@@ -328,17 +327,14 @@ export async function handleBackgroundMessage(
       }
 
       case 'SETTINGS_UPDATE': {
-        const settings = message.payload as Partial<Settings>;
-        if (settings.ai) {
-          settings.ai = sanitizeAiPreferences(settings.ai);
-        }
-        await dependencies.storageService.saveSettings(settings);
+        const settings = message.payload as SettingsPatch;
+        const saved = await dependencies.storageService.saveSettings(settings);
 
         if (typeof settings.refreshInterval === 'number') {
           await dependencies.registerRefreshAlarm?.(settings.refreshInterval);
         }
 
-        return { success: true };
+        return { success: true, data: { settings: saved } };
       }
 
       case 'SETTINGS_GET': {

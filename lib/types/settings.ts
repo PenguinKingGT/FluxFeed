@@ -47,3 +47,8 @@ export interface Settings {
   showUnreadOnly: boolean;
   ai: AiPreferences;
 }
+
+/** Updates only supplied fields; nested AI preferences are merged independently. */
+export type SettingsPatch = Omit<Partial<Settings>, 'ai'> & {
+  ai?: Partial<AiPreferences>;
+};

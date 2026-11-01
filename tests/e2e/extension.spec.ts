@@ -262,6 +262,41 @@ test('configures AI summaries and opens the daily briefing route', async ({ exte
   await expect(page.getByText('No articles arrived today.')).toBeVisible();
 });
 
+test('persists consecutive preference and AI field changes without reverting earlier edits', async ({ extension, fixtureServer }) => {
+  const { context, extensionId } = extension;
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1600, height: 900 });
+  const settingsUrl = `chrome-extension://${extensionId}/options.html#/settings`;
+  await page.goto(`${settingsUrl}?section=ai`);
+  const apiUrl = page.getByLabel('API URL');
+  const model = page.getByLabel('Model', { exact: true });
+  await apiUrl.fill(`${fixtureServer.origin}/ai/chat/completions`);
+  await model.fill('consecutive-edits-model');
+  await expect(apiUrl).toHaveValue(`${fixtureServer.origin}/ai/chat/completions`);
+  await expect(model).toHaveValue('consecutive-edits-model');
+
+  const instructions = page.getByLabel('Additional instructions');
+  await instructions.pressSequentially('focus on useful examples', { delay: 20 });
+  await model.click();
+  await expect(instructions).toHaveValue('focus on useful examples');
+
+  await page.goto(`${settingsUrl}?section=appearance`);
+  const themes = page.getByRole('radiogroup', { name: 'Color Theme' });
+  await themes.getByLabel('Forest', { exact: true }).click();
+  const large = page.getByLabel('Large 19px');
+  await large.click();
+  await expect(themes.getByLabel('Forest', { exact: true })).toBeChecked();
+  await expect(large).toHaveAttribute('data-state', 'on');
+
+  await page.reload();
+
+  await expect(themes.getByLabel('Forest', { exact: true })).toBeChecked();
+  await expect(large).toHaveAttribute('data-state', 'on');
+  await expect(apiUrl).toHaveValue(`${fixtureServer.origin}/ai/chat/completions`);
+  await expect(model).toHaveValue('consecutive-edits-model');
+  await expect(instructions).toHaveValue('focus on useful examples');
+});
+
 test('completes the subscription, reading, persistence, search, and deletion workflow', async ({ extension, fixtureServer }) => {
   const { context, extensionId } = extension;
   const fixtureFeedUrl = fixtureServer.feedUrl;
