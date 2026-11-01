@@ -188,6 +188,162 @@ describe('storage service', () => {
     ]);
   });
 
+  it('reads only scoped article bodies when querying a feed or folder', async () => {
+    await storageService.saveGroup(createGroup());
+    await storageService.saveGroup(createGroup({ id: 'child', parentId: 'group-1' }));
+    await storageService.saveFeed(createFeed({ groupId: 'group-1' }));
+    await storageService.saveFeed(createFeed({
+      id: 'child-feed',
+      url: 'https://example.com/child',
+      groupId: 'child',
+    }));
+    await storageService.saveArticles([
+      createArticle(),
+      createArticle({ id: 'child-article', feedId: 'child-feed' }),
+      ...Array.from({ length: 120 }, (_, index) => createArticle({
+        id: `other-${index}`,
+        feedId: `other-feed-${index}`,
+        content: 'Long article body. '.repeat(1000),
+      })),
+    ]);
+    const readFeedIds: string[] = [];
+    /** Records materialized article bodies rather than relying on timing thresholds. */
+    const trackRead = (article: Article): Article => {
+      readFeedIds.push(article.feedId);
+      return article;
+    };
+    database.articles.hook('reading', trackRead);
+
+    try {
+      expect(await storageService.getArticles({ feedId: 'feed-1' })).toHaveLength(1);
+      expect(readFeedIds).toEqual(['feed-1']);
+
+      readFeedIds.length = 0;
+      expect(await storageService.getArticles({ groupId: 'group-1' })).toHaveLength(2);
+      expect(readFeedIds.sort()).toEqual(['child-feed', 'feed-1']);
+    } finally {
+      database.articles.hook('reading').unsubscribe(trackRead);
+    }
+  });
+
+  it('paginates date-index queries without materializing the full result set', async () => {
+    await storageService.saveArticles(Array.from({ length: 120 }, (_, index) => createArticle({
+      id: `article-${index}`,
+      publishedAt: index,
+      content: 'Long article body. '.repeat(1000),
+    })));
+    const readIds: string[] = [];
+    /** Counts returned database values to catch eager full-table loading. */
+    const trackRead = (article: Article): Article => {
+      readIds.push(article.id);
+      return article;
+    };
+    database.articles.hook('reading', trackRead);
+
+    try {
+      const articles = await storageService.getArticles({
+        publishedAfter: 20,
+        publishedBefore: 100,
+        offset: 2,
+        limit: 3,
+      });
+      expect(articles.map((article) => article.id)).toEqual([
+        'article-97', 'article-96', 'article-95',
+      ]);
+      expect(readIds).toHaveLength(3);
+    } finally {
+      database.articles.hook('reading').unsubscribe(trackRead);
+    }
+  });
+
+  it('retrieves feed GUIDs without reading any article bodies', async () => {
+    await storageService.saveArticles([
+      createArticle({ guid: 'guid-b' }),
+      createArticle({ id: 'article-2', guid: 'guid-a' }),
+      createArticle({ id: 'other', feedId: 'other-feed', guid: 'guid-other' }),
+    ]);
+    let bodiesRead = 0;
+    /** Index-only GUID queries must never hydrate article records. */
+    const trackRead = (article: Article): Article => {
+      bodiesRead += 1;
+      return article;
+    };
+    database.articles.hook('reading', trackRead);
+
+    try {
+      expect((await storageService.getArticleGuids('feed-1')).sort()).toEqual(['guid-a', 'guid-b']);
+      expect(await storageService.getArticleGuids('missing')).toEqual([]);
+      expect(bodiesRead).toBe(0);
+    } finally {
+      database.articles.hook('reading').unsubscribe(trackRead);
+    }
+  });
+
+  it('preserves source intersections, date boundaries, flags, and publication tie order', async () => {
+    await storageService.saveGroup(createGroup());
+    await storageService.saveGroup(createGroup({ id: 'child', parentId: 'group-1' }));
+    await storageService.saveFeed(createFeed({ groupId: 'group-1' }));
+    await storageService.saveFeed(createFeed({
+      id: 'child-feed',
+      url: 'https://example.com/child',
+      groupId: 'child',
+    }));
+    await storageService.saveArticles([
+      createArticle({ id: 'a', publishedAt: 50, isStarred: true }),
+      createArticle({
+        id: 'b',
+        feedId: 'child-feed',
+        publishedAt: 50,
+        isRead: true,
+        isStarred: true,
+      }),
+      createArticle({ id: 'c', publishedAt: 50, isStarred: true }),
+      createArticle({ id: 'd', publishedAt: 60 }),
+      createArticle({
+        id: 'e',
+        feedId: 'child-feed',
+        publishedAt: 70,
+        isRead: true,
+        isStarred: true,
+      }),
+      createArticle({ id: 'z', feedId: 'unrelated', publishedAt: 90 }),
+    ]);
+
+    expect((await storageService.getArticles()).map((article) => article.id))
+      .toEqual(['z', 'e', 'd', 'c', 'b', 'a']);
+    expect((await storageService.getArticles({ groupId: 'group-1' })).map((article) => article.id))
+      .toEqual(['e', 'd', 'c', 'b', 'a']);
+    expect((await storageService.getArticles({ feedId: 'feed-1' })).map((article) => article.id))
+      .toEqual(['d', 'c', 'a']);
+    expect((await storageService.getArticles({
+      groupId: 'group-1',
+      feedId: 'child-feed',
+    })).map((article) => article.id)).toEqual(['e', 'b']);
+    expect(await storageService.getArticles({ groupId: 'group-1', feedId: 'unrelated' })).toEqual([]);
+    expect(await storageService.getArticles({ groupId: 'missing' })).toEqual([]);
+    expect((await storageService.getArticles({
+      onlyUnread: true,
+      onlyStarred: true,
+      offset: 1,
+      limit: 1,
+    })).map((article) => article.id)).toEqual(['a']);
+    expect((await storageService.getArticles({
+      groupId: 'group-1',
+      publishedAfter: 50,
+      publishedBefore: 60,
+      offset: 1,
+      limit: 1,
+    })).map((article) => article.id)).toEqual(['b']);
+    expect((await storageService.getArticles({ publishedAfter: 60 })).map((article) => article.id))
+      .toEqual(['z', 'e', 'd']);
+    expect((await storageService.getArticles({ publishedBefore: 60 })).map((article) => article.id))
+      .toEqual(['c', 'b', 'a']);
+    expect(await storageService.getArticles({ publishedAfter: 60, publishedBefore: 50 })).toEqual([]);
+    expect(await storageService.getArticles({ publishedAfter: 60, publishedBefore: 60 })).toEqual([]);
+    expect(await storageService.getArticles({ limit: 0 })).toEqual([]);
+    expect((await storageService.getArticles({ offset: -1 })).map((article) => article.id)).toEqual(['a']);
+  });
+
   it('counts unread articles and removes articles by feed', async () => {
     await storageService.saveArticles([
       createArticle({ id: 'article-1', feedId: 'feed-1' }),

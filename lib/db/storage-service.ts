@@ -1,18 +1,11 @@
+import Dexie from 'dexie';
 import type { Article, DailyDigest, Feed, Group, Settings, TreeNodeMove } from '@/lib/types';
 import type { FluxFeedDatabase } from './database';
 import { ensureDatabaseDefaults } from './database-service';
 import { DEFAULT_SETTINGS } from './defaults';
+import { queryArticles, type GetArticlesOptions } from './article-query';
 
-export interface GetArticlesOptions {
-  feedId?: string;
-  groupId?: string;
-  onlyUnread?: boolean;
-  onlyStarred?: boolean;
-  limit?: number;
-  offset?: number;
-  publishedAfter?: number;
-  publishedBefore?: number;
-}
+export type { GetArticlesOptions } from './article-query';
 
 export interface StorageService {
   getFeed(feedId: string): Promise<Feed | undefined>;
@@ -25,6 +18,7 @@ export interface StorageService {
   removeGroup(groupId: string): Promise<void>;
   moveTreeNode(move: TreeNodeMove): Promise<void>;
   getArticles(options?: GetArticlesOptions): Promise<Article[]>;
+  getArticleGuids(feedId: string): Promise<string[]>;
   getArticle(articleId: string): Promise<Article | undefined>;
   saveArticles(articles: Article[]): Promise<void>;
   updateArticle(articleId: string, patch: Partial<Article>): Promise<void>;
@@ -171,47 +165,23 @@ export function createStorageService(database: FluxFeedDatabase): StorageService
       });
     },
 
+    /** Queries articles without eagerly loading unrelated source bodies. */
     async getArticles(options = {}) {
-      let articles = await database.articles.orderBy('publishedAt').reverse().toArray();
+      return queryArticles(database, options);
+    },
 
-      if (options.feedId) {
-        articles = articles.filter((article) => article.feedId === options.feedId);
-      }
-
-      if (options.groupId) {
-        const groups = await database.groups.toArray();
-        const groupIds = new Set([
-          options.groupId,
-          ...groups.filter((group) => group.parentId === options.groupId).map((group) => group.id),
-        ]);
-        const feedIds = new Set(
-          (await database.feeds.toArray())
-            .filter((feed) => feed.groupId && groupIds.has(feed.groupId))
-            .map((feed) => feed.id),
-        );
-        articles = articles.filter((article) => feedIds.has(article.feedId));
-      }
-
-      if (options.onlyUnread) {
-        articles = articles.filter((article) => !article.isRead);
-      }
-
-      if (options.onlyStarred) {
-        articles = articles.filter((article) => article.isStarred);
-      }
-
-      if (options.publishedAfter !== undefined) {
-        articles = articles.filter((article) => article.publishedAt >= options.publishedAfter!);
-      }
-
-      if (options.publishedBefore !== undefined) {
-        articles = articles.filter((article) => article.publishedAt < options.publishedBefore!);
-      }
-
-      const offset = options.offset ?? 0;
-      const end = options.limit === undefined ? undefined : offset + options.limit;
-
-      return articles.slice(offset, end);
+    /** Reads GUIDs from compound index keys only, never materializing article bodies. */
+    async getArticleGuids(feedId) {
+      const keys = await database.articles.where('[feedId+guid]')
+        .between([feedId, Dexie.minKey], [feedId, Dexie.maxKey])
+        .keys();
+      return keys.map((key) => {
+        // Dexie's generic key type does not encode this compound index's shape.
+        if (!Array.isArray(key) || typeof key[1] !== 'string') {
+          throw new Error('Invalid article GUID index key');
+        }
+        return key[1];
+      });
     },
 
     async getArticle(articleId) {

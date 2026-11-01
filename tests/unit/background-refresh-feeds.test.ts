@@ -26,7 +26,7 @@ describe('background refresh feeds', () => {
     const feed = createFeed();
     const storageService = {
       getFeeds: vi.fn(),
-      getArticles: vi.fn().mockResolvedValue([{ id: 'legacy-article-id', guid: 'old-guid' }]),
+      getArticleGuids: vi.fn().mockResolvedValue(['old-guid']),
       saveArticles: vi.fn(),
       updateFeed: vi.fn(),
     };
@@ -67,6 +67,7 @@ describe('background refresh feeds', () => {
     });
 
     expect(savedCount).toBe(1);
+    expect(storageService.getArticleGuids).toHaveBeenCalledWith(feed.id);
     expect(fetchFeed).toHaveBeenCalledWith(feed.url);
     expect(storageService.saveArticles).toHaveBeenCalledWith([
       expect.objectContaining({
@@ -90,7 +91,7 @@ describe('background refresh feeds', () => {
     const feed = createFeed({ errorCount: 2 });
     const storageService = {
       getFeeds: vi.fn(),
-      getArticles: vi.fn(),
+      getArticleGuids: vi.fn(),
       saveArticles: vi.fn(),
       updateFeed: vi.fn(),
     };
@@ -107,7 +108,7 @@ describe('background refresh feeds', () => {
     const feeds = [createFeed({ id: 'feed-1' }), createFeed({ id: 'feed-2', url: 'https://example.org/rss' })];
     const storageService = {
       getFeeds: vi.fn().mockResolvedValue(feeds),
-      getArticles: vi.fn().mockResolvedValue([]),
+      getArticleGuids: vi.fn().mockResolvedValue([]),
       saveArticles: vi.fn(),
       updateFeed: vi.fn(),
     };
@@ -146,7 +147,7 @@ describe('background refresh feeds', () => {
     let maximumActiveRequests = 0;
     const storageService = {
       getFeeds: vi.fn().mockResolvedValue(feeds),
-      getArticles: vi.fn(),
+      getArticleGuids: vi.fn(),
       saveArticles: vi.fn(),
       updateFeed: vi.fn(),
     };

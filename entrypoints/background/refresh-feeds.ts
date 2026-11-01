@@ -6,7 +6,7 @@ export const REFRESH_CONCURRENCY = 5;
 
 interface RefreshStorageService {
   getFeeds(): Promise<Feed[]>;
-  getArticles(options?: { feedId?: string }): Promise<Pick<Article, 'id' | 'guid'>[]>;
+  getArticleGuids(feedId: string): Promise<string[]>;
   saveArticles(articles: Article[]): Promise<void>;
   updateFeed(feedId: string, patch: Partial<Feed>): Promise<void>;
 }
@@ -39,6 +39,7 @@ export function convertParsedArticleToArticle(
   };
 }
 
+/** Fetches a feed and checks stored GUID index keys before saving new articles. */
 export async function refreshSingleFeed(
   feed: Feed,
   dependencies: RefreshFeedsDependencies,
@@ -51,8 +52,7 @@ export async function refreshSingleFeed(
   }
 
   const fetchedAt = dependencies.now?.() ?? Date.now();
-  const existingArticles = await dependencies.storageService.getArticles({ feedId: feed.id });
-  const existingGuids = new Set(existingArticles.map((article) => article.guid));
+  const existingGuids = new Set(await dependencies.storageService.getArticleGuids(feed.id));
   const newArticles = result.feed.articles
     .map((article) => convertParsedArticleToArticle(article, feed, fetchedAt))
     .filter((article) => !existingGuids.has(article.guid));
