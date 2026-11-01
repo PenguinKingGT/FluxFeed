@@ -84,6 +84,32 @@ export async function startFixtureServer(): Promise<FixtureServer> {
       }));
       return;
     }
+    if (request.url === '/text-only.json') {
+      response.writeHead(200, { 'Content-Type': 'application/feed+json' });
+      response.end(JSON.stringify({
+        version: 'https://jsonfeed.org/version/1.1', title: 'Text Feed',
+        items: [{ id: 'text-only', title: 'Text-only body', url: 'https://example.com/text',
+          content_text: '2 < 3 & 4 > 1\n<script>literal</script>\nLast line', summary: 'Short fallback' }],
+      }));
+      return;
+    }
+    if (request.url === '/mixed-xhtml.xml') {
+      response.writeHead(200, { 'Content-Type': 'application/atom+xml' });
+      response.end(`<feed xmlns="http://www.w3.org/2005/Atom"><title>XHTML Feed</title><entry>
+        <id>xhtml</id><title>Mixed XHTML</title><link href="https://example.com/xhtml"/>
+        <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>Before <em>middle</em> after <a href="javascript:alert(1)">unsafe</a>.</p><ul><li>First item</li></ul><pre> a\n  b</pre></div></content>
+        </entry></feed>`);
+      return;
+    }
+    if (request.url === '/large-feed.xml') {
+      const items = Array.from({ length: 2000 }, (_, index) => `
+        <item><guid>large-${index}</guid><title>Large article ${index}</title>
+        <link>https://example.com/large/${index}</link><description>Body ${index}</description>
+        <pubDate>${new Date(Date.UTC(2026, 9, 31) - index * 60000).toUTCString()}</pubDate></item>`).join('');
+      response.writeHead(200, { 'Content-Type': 'application/rss+xml' });
+      response.end(`<rss><channel><title>Large Feed</title>${items}</channel></rss>`);
+      return;
+    }
     if (request.url?.startsWith('/refresh-feed.xml')) {
       refresh.requests.push(request.url);
       if (refresh.rejectRequests) {

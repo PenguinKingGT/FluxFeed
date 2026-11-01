@@ -1,38 +1,41 @@
 import type { ParsedFeed } from '@/lib/types';
-import { asArray, fallbackTitle, getRecord, parseDate, readText, xmlParser } from './parser-utils';
+import { fallbackTitle, getRecord, parseDate, readText } from './parser-utils';
+import { atomChildren, atomContent, atomText, parseAtomNodes, type AtomNode } from './atom-content';
 
-function pickLink(linkValue: unknown): string {
-  const links = asArray(linkValue).map(getRecord);
+/** Selects the human-readable link while retaining the legacy first-link fallback. */
+function pickLink(children: AtomNode[]): string {
+  const links = children.filter((node) => 'link' in node).map((node) => getRecord(node[':@']));
   const alternate = links.find((link) => readText(link['@_rel']) === 'alternate');
   const selected = alternate ?? links.find((link) => readText(link['@_href']));
-
   return readText(selected?.['@_href']);
 }
 
+/** Parses ordered Atom constructs without a browser DOM; rendered bodies still require sanitization. */
 export function parseAtomFeed(xml: string): ParsedFeed {
-  const parsed = getRecord(xmlParser.parse(xml));
-  const feed = getRecord(parsed.feed);
-  const entries = asArray(feed.entry).map((entry) => {
-    const record = getRecord(entry);
-    const content = readText(record.content) || readText(record.summary);
-    const url = pickLink(record.link);
-
+  const parsed = parseAtomNodes(xml);
+  const feed = atomChildren(parsed.find((node) => 'feed' in node), 'feed');
+  const entries = feed.filter((node) => 'entry' in node).map((node) => atomChildren(node, 'entry'));
+  const articles = entries.map((entry) => {
+    const summary = atomContent(entry, 'summary');
+    const content = atomContent(entry, 'content') || summary;
+    const url = pickLink(entry);
+    const author = atomChildren(entry.find((node) => 'author' in node), 'author');
     return {
-      guid: readText(record.id) || url,
-      title: fallbackTitle(record.title, content),
-      summary: readText(record.summary),
+      guid: atomText(entry, 'id') || url,
+      title: fallbackTitle(atomText(entry, 'title'), content),
+      summary,
       content,
-      author: readText(getRecord(record.author).name),
-      publishedAt: parseDate(record.published || record.updated),
+      author: atomText(author, 'name'),
+      publishedAt: parseDate(atomText(entry, 'published') || atomText(entry, 'updated')),
       url,
     };
   });
 
   return {
-    title: readText(feed.title),
-    description: readText(feed.subtitle),
-    siteUrl: pickLink(feed.link),
-    iconUrl: readText(feed.icon),
-    articles: entries,
+    title: atomText(feed, 'title'),
+    description: atomText(feed, 'subtitle'),
+    siteUrl: pickLink(feed),
+    iconUrl: atomText(feed, 'icon'),
+    articles,
   };
 }

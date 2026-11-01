@@ -8,6 +8,10 @@ import type { Article, Feed } from '@/lib/types';
 import type { ArticleFilter } from '@/store/articleStore';
 import { ArticleCard } from './ArticleCard';
 
+const ESTIMATED_ARTICLE_HEIGHT = 140;
+const INITIAL_VISIBLE_ROWS = 12;
+const INITIAL_VIEWPORT = { width: 340, height: 600 };
+
 interface ArticlePanelProps {
   articles: Article[];
   feeds: Feed[];
@@ -46,15 +50,25 @@ export function ArticlePanel({
   const parentRef = useRef<HTMLDivElement>(null);
   const pendingFocusId = useRef<string | null>(null);
   const feedById = useMemo(() => new Map(feeds.map((feed) => [feed.id, feed])), [feeds]);
-  const estimatedArticleHeight = 140;
+  const estimatedArticleHeight = ESTIMATED_ARTICLE_HEIGHT;
   const rowVirtualizer = useVirtualizer({
     count: articles.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => estimatedArticleHeight,
     overscan: 6,
+    initialRect: INITIAL_VIEWPORT,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
-  const renderedItems = virtualItems.length > 0 ? virtualItems : articles.map((_, index) => ({ key: index, index, start: index * estimatedArticleHeight, size: estimatedArticleHeight }));
+  // Hidden/unmeasured containers must never turn a cached library into a full DOM list.
+  const renderedItems = virtualItems.length > 0 ? virtualItems : Array.from(
+    { length: Math.min(articles.length, INITIAL_VISIBLE_ROWS) },
+    (_, index) => ({
+      key: index,
+      index,
+      start: index * estimatedArticleHeight,
+      size: estimatedArticleHeight,
+    }),
+  );
 
   // Keep list focus with the selected article, including rows outside the virtual window.
   useLayoutEffect(() => {

@@ -103,4 +103,23 @@ describe('Reader ArticlePanel', () => {
     expect(screen.getByText('Design')).not.toBeNull();
     expect(screen.getByText('Untagged article').closest('article')?.textContent).not.toContain('General');
   });
+
+  it('bounds rows before measurement, while hidden, and after returning to a cached list', () => {
+    const articles = Array.from({ length: 3000 }, (_, index) => article({ id: `a${index}` }));
+    const props = {
+      articles, feeds: [feed], activeArticleId: 'a0',
+      filter: { view: 'all' as const, showUnreadOnly: false }, isLoading: false,
+      setFilter: vi.fn(), refreshFeed: vi.fn(), setActiveArticle: vi.fn(), onOpenNavigation: vi.fn(),
+    };
+    const first = render(<ArticlePanel {...props} />);
+    expect(first.container.querySelectorAll('[data-reader-article-id]').length).toBeLessThanOrEqual(24);
+    first.rerender(<div style={{ display: 'none' }}><ArticlePanel {...props} /></div>);
+    expect(first.container.querySelectorAll('[data-reader-article-id]').length).toBeLessThanOrEqual(24);
+    first.unmount();
+    const returned = render(<ArticlePanel {...props} />);
+    expect(returned.container.querySelectorAll('[data-reader-article-id]').length).toBeLessThanOrEqual(24);
+    returned.rerender(<ArticlePanel {...props} articles={[]} />);
+    expect(returned.container.querySelectorAll('[data-reader-article-id]')).toHaveLength(0);
+  });
+
 });

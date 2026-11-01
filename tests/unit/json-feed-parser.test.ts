@@ -57,4 +57,26 @@ describe('JSON Feed parser', () => {
     expect(feed.articles[0]!.publishedAt).toBeGreaterThanOrEqual(before);
     expect(feed.articles[0]!.publishedAt).toBeLessThanOrEqual(after);
   });
+
+  it('preserves text-only content as escaped HTML with line breaks, ahead of the summary', () => {
+    const feed = parseJsonFeed(JSON.stringify({ items: [{
+      id: 'text', content_text: '2 < 3 & 4 > 1\n<script>literal</script>\r\nnext', summary: 'Short',
+    }] }));
+    const container = document.createElement('div');
+    container.innerHTML = feed.articles[0].content;
+    expect(container.textContent).toBe('2 < 3 & 4 > 1<script>literal</script>next');
+    expect(container.querySelectorAll('br')).toHaveLength(2);
+    expect(container.querySelector('script')).toBeNull();
+    expect(feed.articles[0].title).toBe('2 < 3 & 4 > 1 <script>literal</script> next');
+  });
+
+  it('prefers HTML over text and never decodes literal entity notation in plain text', () => {
+    const feed = parseJsonFeed(JSON.stringify({ items: [
+      { content_html: '<p>HTML &amp; body</p>', content_text: 'Other text' },
+      { content_text: '&lt;literal&gt;' },
+    ] }));
+    expect(feed.articles[0].content).toBe('<p>HTML &amp; body</p>');
+    expect(feed.articles[1].content).toBe('&amp;lt;literal&amp;gt;');
+  });
+
 });
