@@ -5,6 +5,8 @@
 @import "lxgw-wenkai-lite-webfont/lxgwwenkailite-regular.css";
 @import "lxgw-wenkai-lite-webfont/lxgwwenkailite-bold.css";
 
+@import "./article-styles.css";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

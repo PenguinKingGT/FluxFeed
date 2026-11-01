@@ -1,3 +1,4 @@
+import { ArticleStyleSelect } from './ArticleStyleSelect';
 import { Palette } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -165,6 +166,13 @@ export function AppearanceSection({ settings, updateSettings }: AppearanceSectio
           </Select>
         </SettingRow>
         <div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 py-4">
+            <span className="text-sm font-semibold text-foreground">{t('settings.articleStyle')}</span>
+            <ArticleStyleSelect
+              value={settings.articleStyle}
+              onValueChange={(articleStyle) => void updateSettings({ articleStyle })}
+            />
+          </div>
           <FontChoiceGroup
             scope="reading"
             label={t('settings.readingFont')}

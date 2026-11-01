@@ -1,6 +1,7 @@
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 import { DEFAULT_SETTINGS } from '@/lib/db';
+import { normalizeArticleStyle } from '@/lib/reader/article-styles';
 import { applyLanguage } from '@/lib/i18n';
 import { applyFontPreferences } from '@/lib/settings/font-preferences';
 import { normalizeColorTheme } from '@/lib/theme/theme-presets';
@@ -28,6 +29,7 @@ export function createSettingsStore(client: StoreMessageClient) {
       const settings = {
         ...DEFAULT_SETTINGS,
         ...(response.success ? response.data?.settings : undefined),
+        articleStyle: normalizeArticleStyle(response.success ? response.data?.settings.articleStyle : undefined),
         colorTheme: normalizeColorTheme(response.success ? response.data?.settings.colorTheme : undefined),
         id: 'global' as const,
       };
@@ -42,8 +44,11 @@ export function createSettingsStore(client: StoreMessageClient) {
     },
 
     async updateSettings(patch) {
-      const settings = { ...get().settings, ...patch, id: 'global' as const };
-      const response = await client.send({ type: 'SETTINGS_UPDATE', ...patch });
+      const normalizedPatch = 'articleStyle' in patch
+        ? { ...patch, articleStyle: normalizeArticleStyle(patch.articleStyle) }
+        : patch;
+      const settings = { ...get().settings, ...normalizedPatch, id: 'global' as const };
+      const response = await client.send({ type: 'SETTINGS_UPDATE', ...normalizedPatch });
       if (!response.success) {
         set({ error: response.error ?? 'Failed to save settings' });
         return;

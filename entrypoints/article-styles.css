@@ -1,0 +1,315 @@
+/* Bundled document styles. All selectors stay inside sanitized article prose;
+   the original style deliberately has no overrides. Fonts and text size remain user preferences. */
+.reader-prose.article-styled {
+  --article-link: var(--foreground);
+  --article-soft: var(--muted);
+  --article-rule: var(--border);
+  --article-inline: var(--foreground);
+  --article-code-surface: var(--muted);
+  --article-code-text: var(--foreground);
+  --article-leading: 1.75;
+  --tw-prose-links: var(--article-link);
+  --tw-prose-bullets: var(--article-link);
+  --tw-prose-counters: var(--article-link);
+  line-height: var(--article-leading);
+  overflow-wrap: anywhere;
+}
+
+.reader-prose.article-styled :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--foreground);
+  font-family: inherit;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-block: 1.8em 0.65em;
+  scroll-margin-top: 4rem;
+}
+
+.reader-prose.article-styled h1 {
+  font-size: 1.9em;
+}
+.reader-prose.article-styled h2 {
+  font-size: 1.5em;
+}
+.reader-prose.article-styled h3 {
+  font-size: 1.25em;
+}
+.reader-prose.article-styled :is(h4, h5, h6) {
+  font-size: 1em;
+}
+.reader-prose.article-styled p {
+  margin-block: 1em;
+}
+
+.reader-prose.article-styled a {
+  color: var(--article-link);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color 150ms ease;
+}
+
+.reader-prose.article-styled a:hover {
+  text-decoration: underline;
+}
+.reader-prose.article-styled a:focus-visible {
+  outline: 2px solid var(--article-link);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.reader-prose.article-styled :is(ul, ol) {
+  padding-inline-start: 1.6em;
+  margin-block: 1em;
+}
+
+.reader-prose.article-styled li {
+  padding-inline-start: 0.25em;
+  margin-block: 0.4em;
+}
+.reader-prose.article-styled li::marker {
+  color: var(--article-link);
+}
+.reader-prose.article-styled li > :is(ul, ol) {
+  margin-block: 0.3em;
+}
+.reader-prose.article-styled li > p {
+  margin-block: 0.4em;
+}
+
+.reader-prose.article-styled blockquote {
+  color: var(--foreground);
+  border-inline-start: 3px solid var(--article-link);
+  background: var(--article-soft);
+  padding: 0.5em 1.1em;
+  margin: 1.4em 0;
+  font-style: normal;
+  font-weight: 400;
+}
+
+.reader-prose.article-styled blockquote p {
+  margin-block: 0.4em;
+}
+.reader-prose.article-styled blockquote p::before,
+.reader-prose.article-styled blockquote p::after {
+  content: none;
+}
+
+.reader-prose.article-styled :not(pre) > code {
+  color: var(--article-inline);
+  background: var(--article-code-surface);
+  border-radius: 3px;
+  padding: 0.12em 0.35em;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  font-weight: 400;
+}
+
+.reader-prose.article-styled code::before,
+.reader-prose.article-styled code::after {
+  content: none;
+}
+
+.reader-prose.article-styled pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 1em 1.25em;
+  background: var(--article-code-surface);
+  color: var(--article-code-text);
+  border: 1px solid var(--article-rule);
+  border-radius: 6px;
+  box-shadow: none;
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  line-height: 1.65;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.reader-prose.article-styled pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border: 0;
+  font-size: inherit;
+  font-family: inherit;
+  white-space: inherit;
+}
+
+.reader-prose.article-styled table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  margin-block: 1.5em;
+}
+
+.reader-prose.article-styled :is(th, td) {
+  min-width: 7rem;
+  padding: 0.6em 0.9em;
+  border: 1px solid var(--article-rule);
+  text-align: start;
+}
+
+.reader-prose.article-styled th {
+  font-weight: 600;
+  background: var(--article-soft);
+}
+.reader-prose.article-styled tbody tr:nth-child(even) {
+  background: var(--article-soft);
+}
+.reader-prose.article-styled hr {
+  border: 0;
+  border-top: 1px solid var(--article-rule);
+  margin-block: 2em;
+}
+.reader-prose.article-styled :is(img, figure) {
+  border-radius: 6px;
+}
+.reader-prose.article-styled figcaption {
+  background: transparent;
+  font-size: 0.85em;
+}
+
+/* Vue documentation: green anchors, understated heading rules, soft callouts, orange inline code. */
+.reader-prose[data-article-style='vue'] {
+  --article-link: #27855c;
+  --article-soft: color-mix(in srgb, #42b983 9%, var(--background));
+  --article-rule: color-mix(in srgb, #42b983 22%, var(--border));
+  --article-inline: #a65014;
+  --article-code-surface: color-mix(in srgb, var(--foreground) 4%, var(--background));
+}
+
+.dark .reader-prose[data-article-style='vue'] {
+  --article-link: #73d6a3;
+  --article-inline: #f0aa6c;
+}
+.reader-prose[data-article-style='vue'] a {
+  text-decoration: none;
+  font-weight: 500;
+}
+.reader-prose[data-article-style='vue'] h2 {
+  border-bottom: 1px solid var(--article-rule);
+  padding-bottom: 0.4em;
+}
+.reader-prose[data-article-style='vue'] pre {
+  border-radius: 3px;
+}
+
+/* GitHub: familiar documentation rhythm, ruled headings and bordered tables. */
+.reader-prose[data-article-style='github'] {
+  --article-link: #0969da;
+  --article-soft: color-mix(in srgb, var(--foreground) 4%, var(--background));
+  --article-code-surface: var(--article-soft);
+  --article-leading: 1.65;
+}
+
+.dark .reader-prose[data-article-style='github'] {
+  --article-link: #79b8ff;
+}
+.reader-prose[data-article-style='github'] :is(h1, h2) {
+  border-bottom: 1px solid var(--article-rule);
+  padding-bottom: 0.3em;
+}
+.reader-prose[data-article-style='github'] a {
+  text-decoration: none;
+}
+.reader-prose[data-article-style='github'] blockquote {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--muted-foreground);
+}
+.reader-prose[data-article-style='github'] li::marker {
+  color: var(--muted-foreground);
+}
+.reader-prose[data-article-style='github'] pre {
+  border: 0;
+}
+
+/* Editorial: a slower reading rhythm, centered section headings and wine-colored details. */
+.reader-prose[data-article-style='editorial'] {
+  --article-link: #9e4052;
+  --article-soft: color-mix(in srgb, #9e4052 5%, var(--background));
+  --article-code-surface: color-mix(in srgb, var(--foreground) 4%, var(--background));
+  --article-leading: 1.9;
+}
+
+.dark .reader-prose[data-article-style='editorial'] {
+  --article-link: #e8a3ab;
+}
+.reader-prose[data-article-style='editorial'] h2 {
+  text-align: center;
+  border-bottom: 3px double var(--article-rule);
+  padding-bottom: 0.5em;
+  letter-spacing: 0.04em;
+}
+.reader-prose[data-article-style='editorial'] a {
+  text-decoration-style: dotted;
+}
+.reader-prose[data-article-style='editorial'] blockquote {
+  border: 0;
+  border-block: 1px solid var(--article-rule);
+  padding-block: 0.8em;
+  font-style: italic;
+}
+.reader-prose[data-article-style='editorial'] pre {
+  border-radius: 0;
+  border-inline: 0;
+}
+.reader-prose[data-article-style='editorial'] ul {
+  list-style-type: circle;
+}
+.reader-prose[data-article-style='editorial'] :is(th, td) {
+  border-inline: 0;
+}
+.reader-prose[data-article-style='editorial'] tbody tr:nth-child(even) {
+  background: transparent;
+}
+
+/* Minimal: monochrome links, light rules and almost no container decoration. */
+.reader-prose[data-article-style='minimal'] {
+  --article-code-surface: transparent;
+  --article-leading: 1.7;
+}
+.reader-prose[data-article-style='minimal'] :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 500;
+}
+.reader-prose[data-article-style='minimal'] a {
+  text-decoration-color: var(--muted-foreground);
+}
+.reader-prose[data-article-style='minimal'] blockquote {
+  background: transparent;
+  border: 0;
+  border-inline-start: 1px solid var(--border);
+}
+.reader-prose[data-article-style='minimal'] :not(pre) > code {
+  padding-inline: 0;
+}
+.reader-prose[data-article-style='minimal'] pre {
+  border: 0;
+  border-inline-start: 2px solid var(--border);
+  border-radius: 0;
+}
+.reader-prose[data-article-style='minimal'] ul > li::marker {
+  content: '—  ';
+  color: var(--muted-foreground);
+}
+.reader-prose[data-article-style='minimal'] :is(th, td) {
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding-inline-start: 0;
+}
+.reader-prose[data-article-style='minimal'] :is(th, tbody tr:nth-child(even)) {
+  background: transparent;
+}
+.reader-prose[data-article-style='minimal'] :is(img, figure) {
+  border-radius: 0;
+}
+
+.reader-prose.article-styled > :first-child {
+  margin-block-start: 0;
+}
+
+.reader-prose.article-styled > :last-child {
+  margin-block-end: 0;
+}

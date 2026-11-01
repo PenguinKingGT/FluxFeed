@@ -38,3 +38,9 @@ AI 输出按不可信纯文本处理。任何文章 ID 导航都必须与本地�
 - Key 仍仅存于 `browser.storage.local`。兼容模式沿用原 key，Gemini/Claude 使用独立 namespace。凭据消息携带供应商作用域，只返回 presence flag；生成任务按本次配置读取对应 Key。
 - 页面切换供应商会重置地址、模型和未保存的 Key 输入。Key 控件以供应商作为 React key，异步凭据状态不会串到另一个供应商。
 - 单篇与简报缓存指纹均包含供应商。单篇分段、费用约束和简报降级规则继续由相同 AI module 执行。
+
+## 文章排版
+
+`lib/reader/article-styles.ts` 定义可用的正文样式与旧数据回退规则。`Settings.articleStyle` 通过现有后台设置消息保存；无新增索引，无数据库版本迁移。
+
+`ArticleContent` 先清洗 Feed HTML，再为正文根节点设置规范化的 `data-article-style`。`entrypoints/article-styles.css` 的规则全部限制在正文容器内；原始样式不启用新增规则。样式选择器仅放在外观设置中，阅读页应用同一份持久化偏好。切换排版只改变 CSS，不触发内容请求或 AI 调用。

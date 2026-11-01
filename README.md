@@ -27,6 +27,7 @@ AI is optional. If you enable it, FluxFeed connects directly to your configured 
 - **Focus mode:** hide navigation and the article list when you want an uninterrupted reading surface.
 - **Optional AI summaries:** generate a summary for one article manually or automatically above a configurable length.
 - **Today's Briefing:** summarize today's articles in batches, browse topic groups, and jump back to the local story.
+- **Article styles:** choose Original, Vue, GitHub, Editorial, or Minimal in appearance settings. Styles cover links, lists, quotes, code, and tables, with light/dark support and independent font and size preferences.
 - **Appearance controls:** seven color themes (Paper by default, plus bright Sky, Mint, and Peach), system/light/dark modes, adjustable body text, and separate reading/interface fonts.
 - **Multilingual UI:** English, Simplified Chinese, and Japanese.
 - **Chrome and Firefox builds:** produced from the same WXT codebase.

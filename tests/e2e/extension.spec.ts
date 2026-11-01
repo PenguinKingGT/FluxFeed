@@ -76,14 +76,28 @@ test.beforeAll(async () => {
     }
     const isLongFeed = request.url === '/long-feed.xml';
     const isReaderFeed = request.url === '/reader-feed.xml';
-    if (request.url !== '/feed.xml' && !isLongFeed && !isReaderFeed) {
+    const isStyleFeed = request.url === '/style-feed.xml';
+    if (request.url !== '/feed.xml' && !isLongFeed && !isReaderFeed && !isStyleFeed) {
       response.writeHead(404).end();
       return;
     }
 
     let fixtureTitle = 'Integration Test Article';
     let fixtureContent = 'This article verifies the complete subscription and reading workflow.';
-    if (isReaderFeed) {
+    if (isStyleFeed) {
+      fixtureTitle = '文章样式排版示例';
+      fixtureContent = `<h2>内容与层级</h2>
+        <p>文章样式只改变正文排版。<a href="https://example.com/reference">阅读参考文档</a>，或试试行内代码 <code>sizes="auto"</code>。</p>
+        <ul><li>链接与列表保持清楚的层级</li><li>支持嵌套内容<ol><li>先阅读概述</li><li>再查看细节</li></ol></li></ul>
+        <blockquote><p>让内容自然呈现，让长文读起来更轻松。</p></blockquote>
+        <h3>代码与数据</h3><pre><code>function greet(name) {
+  return 'Hello, ' + name;
+}
+// ${'long-line-'.repeat(30)}</code></pre>
+        <table><thead><tr><th>主题</th><th>链接</th><th>引用</th><th>代码</th><th>备注</th></tr></thead>
+        <tbody><tr><td>原始</td><td>清晰</td><td>简洁</td><td>保留缩进</td><td>沿用当前样式</td></tr>
+        <tr><td>Vue 风格</td><td>绿色</td><td>浅色背景</td><td>轻量边框</td><td>文档阅读</td></tr></tbody></table><hr>`;
+    } else if (isReaderFeed) {
       fixtureTitle = '科技爱好者周刊（第 412 期）：禁止 issue，只用 PR';
       fixtureContent = '这里记录每周值得分享的科技内容，让阅读回到内容本身。'.repeat(50);
     } else if (isLongFeed) {
@@ -730,5 +744,83 @@ test('imports from compact data controls and opens originals in a foreground tab
     'chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(tabs => tabs[0]?.url)',
   )).toBe(originalUrl);
   await original.close();
+  await page.close();
+});
+
+
+test('switches all five article styles independently and persists them across settings and reader', async () => {
+  if (!context) {
+    throw new Error('Extension browser context was not created');
+  }
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1600, height: 1100 });
+  await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
+  await page.getByRole('button', { name: '添加订阅', exact: true }).click();
+  await page.getByLabel('订阅地址').fill(fixtureFeedUrl.replace('/feed.xml', '/style-feed.xml'));
+  await page.getByRole('button', { name: '订阅', exact: true }).click();
+  await page.getByRole('button', { name: /文章样式排版示例/ }).click();
+  const prose = page.locator('.reader-prose');
+  const picker = page.getByRole('combobox', { name: '文章样式', exact: true });
+  /** Applies a style in settings and returns to the same article to inspect the result. */
+  async function chooseStyle(name: string) {
+    await page.goto(`chrome-extension://${extensionId}/options.html#/settings?section=appearance`);
+    await picker.click();
+    await expect(page.getByRole('option')).toHaveCount(5);
+    await page.getByRole('option', { name, exact: true }).click();
+    await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
+    await page.getByRole('button', { name: /文章样式排版示例/ }).click();
+    await expect(picker).toHaveCount(0);
+  }
+  await expect(picker).toHaveCount(0);
+  await expect(prose).toHaveAttribute('data-article-style', 'default');
+  const sourceHtml = await prose.innerHTML();
+  const font = await prose.evaluate((element) => getComputedStyle(element).fontFamily);
+  const appTheme = await page.locator('html').getAttribute('data-color-theme');
+  const styles = [
+    { id: 'default', name: '原始', link: 'rgb(28, 29, 26)' },
+    { id: 'vue', name: 'Vue 风格', link: 'rgb(39, 133, 92)' },
+    { id: 'github', name: 'GitHub', link: 'rgb(9, 105, 218)' },
+    { id: 'editorial', name: '书刊', link: 'rgb(158, 64, 82)' },
+    { id: 'minimal', name: '简约', link: 'rgb(28, 29, 26)' },
+  ];
+  const signatures = new Set<string>();
+  for (const style of styles) {
+    await chooseStyle(style.name);
+    await expect(prose).toHaveAttribute('data-article-style', style.id);
+    await expect(prose.locator('a')).toHaveCSS('color', style.link);
+    await expect(prose).toHaveCSS('font-family', font);
+    await expect(page.locator('html')).toHaveAttribute('data-color-theme', appTheme!);
+    expect(await prose.innerHTML()).toBe(sourceHtml);
+    signatures.add(await prose.evaluate((element) => {
+      const code = getComputedStyle(element.querySelector('pre')!);
+      const heading = getComputedStyle(element.querySelector('h2')!);
+      const quote = getComputedStyle(element.querySelector('blockquote')!);
+      return [code.backgroundColor, heading.textAlign, heading.borderBottomStyle, quote.backgroundColor].join('|');
+    }));
+    await page.screenshot({ path: `/tmp/fluxfeed-article-${style.id}-light.png`, animations: 'disabled' });
+  }
+  expect(signatures.size).toBe(5);
+  await page.reload();
+  await page.getByRole('button', { name: /文章样式排版示例/ }).click();
+  await expect(prose).toHaveAttribute('data-article-style', 'minimal');
+  await page.goto(`chrome-extension://${extensionId}/options.html#/settings?section=appearance`);
+  await expect(page.getByRole('combobox', { name: '文章样式', exact: true })).toContainText('简约');
+  await page.getByRole('group', { name: '明暗模式', exact: true }).getByLabel('深色', { exact: true }).click();
+  await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
+  await page.getByRole('button', { name: /文章样式排版示例/ }).click();
+  const darkLinkColors = ['rgb(235, 233, 225)', 'rgb(115, 214, 163)', 'rgb(121, 184, 255)', 'rgb(232, 163, 171)', 'rgb(235, 233, 225)'];
+  for (const [index, style] of styles.entries()) {
+    await chooseStyle(style.name);
+    await expect(prose.locator('a')).toHaveCSS('color', darkLinkColors[index]);
+    await page.screenshot({ path: `/tmp/fluxfeed-article-${style.id}-dark.png`, animations: 'disabled' });
+  }
+  await chooseStyle('Vue 风格');
+  await page.setViewportSize({ width: 390, height: 800 });
+  const pane = page.getByTestId('reading-pane');
+  await expect.poll(() => pane.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  for (const element of [prose.locator('pre'), prose.locator('table')]) {
+    await expect.poll(() => element.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
+  }
+  await page.screenshot({ path: '/tmp/fluxfeed-article-vue-mobile.png', animations: 'disabled' });
   await page.close();
 });

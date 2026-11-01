@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 const ALLOWED_TAGS = [
   'p',
   'br',
+  'hr',
   'h1',
   'h2',
   'h3',

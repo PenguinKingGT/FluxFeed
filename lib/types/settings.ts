@@ -1,3 +1,5 @@
+export type ArticleStyle = 'default' | 'vue' | 'github' | 'editorial' | 'minimal';
+
 export type ReadingFont = 'system-serif' | 'system-sans' | 'lxgw-wenkai';
 export type InterfaceFont = 'system-sans' | 'lxgw-wenkai';
 export type ColorTheme =
@@ -36,6 +38,8 @@ export interface Settings {
   theme: 'light' | 'dark' | 'system';
   colorTheme: ColorTheme;
   language: 'en' | 'zh-CN' | 'ja';
+  /** Missing in older installations keeps the original article presentation. */
+  articleStyle?: ArticleStyle;
   readingFont: ReadingFont;
   interfaceFont: InterfaceFont;
   fontSize: 'small' | 'medium' | 'large';

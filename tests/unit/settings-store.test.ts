@@ -165,6 +165,34 @@ describe('settings store', () => {
     expect(document.documentElement.dataset.colorTheme).toBe('quiet-signal');
   });
 
+  it.each([undefined, 'unknown-style'])('falls back to original article styling for %s', async (articleStyle) => {
+    const client = {
+      send: vi.fn().mockResolvedValue({
+        success: true,
+        data: { settings: { ...DEFAULT_SETTINGS, articleStyle } },
+      }),
+    };
+    const store = createSettingsStore(client);
+    await store.getState().loadSettings();
+    expect(store.getState().settings.articleStyle).toBe('default');
+  });
+
+  it('persists only the article style patch and keeps the other reading preferences', async () => {
+    const client = { send: vi.fn().mockResolvedValue({ success: true }) };
+    const store = createSettingsStore(client);
+    await store.getState().updateSettings({ articleStyle: 'vue' });
+    expect(client.send).toHaveBeenCalledWith({ type: 'SETTINGS_UPDATE', articleStyle: 'vue' });
+    expect(store.getState().settings).toMatchObject({
+      articleStyle: 'vue',
+      colorTheme: DEFAULT_SETTINGS.colorTheme,
+      readingFont: DEFAULT_SETTINGS.readingFont,
+      fontSize: DEFAULT_SETTINGS.fontSize,
+    });
+    client.send.mockResolvedValue({ success: false });
+    await store.getState().updateSettings({ articleStyle: 'github' });
+    expect(store.getState().settings.articleStyle).toBe('vue');
+  });
+
   it('tracks system theme changes and removes the listener for fixed themes', () => {
     applyTheme('system', 'forest');
 

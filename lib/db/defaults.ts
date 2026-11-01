@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   colorTheme: 'quiet-signal',
   language: 'en',
+  articleStyle: 'default',
   readingFont: 'system-serif',
   interfaceFont: 'system-sans',
   fontSize: 'medium',

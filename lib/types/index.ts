@@ -31,6 +31,7 @@ export type {
   AiProvider,
   AiSummaryLanguage,
   AiSummaryLength,
+  ArticleStyle,
   ColorTheme,
   InterfaceFont,
   ReadingFont,
