@@ -1,227 +1,29 @@
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
-import path from 'node:path';
-import { chromium, expect, test, type BrowserContext } from '@playwright/test';
+import { DEFAULT_SETTINGS } from '@/lib/db/defaults';
+import { expect, test } from './fixtures';
 
-let context: BrowserContext | undefined;
-let extensionId: string;
-let fixtureServer: Server | undefined;
-let fixtureFeedUrl: string;
-let aiRequests = 0;
-let rejectAiRequests = false;
-let nativeRequests: Array<{ provider: string; key?: string; body: string }> = [];
+test('subscribes using a website URL in a DOM-free extension worker', async ({ extension, fixtureServer }) => {
+  const { context, extensionId, worker } = extension;
+  expect(await worker.evaluate(() => typeof DOMParser)).toBe('undefined');
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
+  await page.getByRole('button', { name: 'Add Feed', exact: true }).click();
+  await page.getByLabel('Feed URL').fill(`${fixtureServer.origin}/discovery/website`);
+  await page.getByRole('button', { name: 'Subscribe', exact: true }).click();
 
-test.beforeAll(async () => {
-  fixtureServer = createServer((request, response) => {
-    let nativeProvider: 'google' | 'anthropic' | null = null;
-    if (request.url?.startsWith('/google/models/')) {
-      nativeProvider = 'google';
-    } else if (request.url === '/anthropic/messages') {
-      nativeProvider = 'anthropic';
-    }
-    if (nativeProvider) {
-      let body = '';
-      request.on('data', (chunk) => {
-        body += chunk.toString();
-      });
-      request.on('end', () => {
-        const key = request.headers[nativeProvider === 'google' ? 'x-goog-api-key' : 'x-api-key'];
-        nativeRequests.push({
-          provider: nativeProvider,
-          key: typeof key === 'string' ? key : undefined,
-          body,
-        });
-        const text = JSON.stringify({
-          overview: `Native ${nativeProvider} summary ${nativeRequests.length}`,
-          keyPoints: ['A native protocol summary'],
-        });
-        const result = nativeProvider === 'google'
-          ? {
-            candidates: [{ content: { role: 'model', parts: [{ text }] }, finishReason: 'STOP' }],
-            usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 3, totalTokenCount: 13 },
-          }
-          : {
-            id: 'msg_local',
-            type: 'message',
-            role: 'assistant',
-            model: 'claude-sonnet-4-5',
-            content: [{ type: 'text', text }],
-            stop_reason: 'end_turn',
-            stop_sequence: null,
-            usage: { input_tokens: 10, output_tokens: 3 },
-          };
-        response.writeHead(200, { 'Content-Type': 'application/json' });
-        response.end(JSON.stringify(result));
-      });
-      return;
-    }
-    if (request.url === '/ai/chat/completions') {
-      aiRequests += 1;
-      request.resume();
-      response.writeHead(rejectAiRequests ? 500 : 200, {
-        'Content-Type': 'application/json',
-      });
-      response.end(JSON.stringify({
-        choices: [{ message: { content: JSON.stringify({
-          overview: `Local AI summary ${aiRequests}`,
-          keyPoints: ['A verified section summary'],
-        }) } }],
-      }));
-      return;
-    }
-    if (request.url === '/article-1') {
-      response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      response.end('<!doctype html><title>Original article</title><p>Original article content.</p>');
-      return;
-    }
-    if (request.url === '/discovery/website') {
-      response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      response.end(`<!doctype html><html><head>
-        <!-- <link rel="alternate" type="application/rss+xml" href="/comment-feed"> -->
-        <link rel="alternate" type="application/rss+xml" href="http://[invalid">
-        <link rel="alternate" type="application/rss+xml" href="feed.xml?format=rss&amp;lang=en">
-        </head><body>Website with a relative feed link.</body></html>`);
-      return;
-    }
-    if (request.url === '/discovery/feed.xml?format=rss&lang=en') {
-      response.writeHead(200, { 'Content-Type': 'application/rss+xml; charset=utf-8' });
-      response.end(`<rss><channel>
-        <title>Website Discovery Feed</title>
-        <item><guid>discovered-article</guid><title>Discovered Website Article</title>
-          <link>http://127.0.0.1/article-1</link>
-          <description>Read after discovering a feed in the extension worker.</description>
-          <pubDate>Tue, 28 Jul 2026 12:00:00 GMT</pubDate>
-        </item></channel></rss>`);
-      return;
-    }
-    const isLongFeed = request.url === '/long-feed.xml';
-    const isReaderFeed = request.url === '/reader-feed.xml';
-    const isStyleFeed = request.url === '/style-feed.xml';
-    if (request.url !== '/feed.xml' && !isLongFeed && !isReaderFeed && !isStyleFeed) {
-      response.writeHead(404).end();
-      return;
-    }
-
-    let fixtureTitle = 'Integration Test Article';
-    let fixtureContent = 'This article verifies the complete subscription and reading workflow.';
-    if (isStyleFeed) {
-      fixtureTitle = '文章样式排版示例';
-      fixtureContent = `<h2>内容与层级</h2>
-        <p>文章样式只改变正文排版。<a href="https://example.com/reference">阅读参考文档</a>，或试试行内代码 <code>sizes="auto"</code>。</p>
-        <ul><li>链接与列表保持清楚的层级</li><li>支持嵌套内容<ol><li>先阅读概述</li><li>再查看细节</li></ol></li></ul>
-        <blockquote><p>让内容自然呈现，让长文读起来更轻松。</p></blockquote>
-        <h3>代码与数据</h3><pre><code>function greet(name) {
-  return 'Hello, ' + name;
-}
-// ${'long-line-'.repeat(30)}</code></pre>
-        <table><thead><tr><th>主题</th><th>链接</th><th>引用</th><th>代码</th><th>备注</th></tr></thead>
-        <tbody><tr><td>原始</td><td>清晰</td><td>简洁</td><td>保留缩进</td><td>沿用当前样式</td></tr>
-        <tr><td>Vue 风格</td><td>绿色</td><td>浅色背景</td><td>轻量边框</td><td>文档阅读</td></tr></tbody></table><hr>`;
-    } else if (isReaderFeed) {
-      fixtureTitle = '科技爱好者周刊（第 412 期）：禁止 issue，只用 PR';
-      fixtureContent = '这里记录每周值得分享的科技内容，让阅读回到内容本身。'.repeat(50);
-    } else if (isLongFeed) {
-      fixtureTitle = 'Long Summary Article';
-      fixtureContent = 'Long article evidence. '.repeat(7200);
-    }
-
-    response.writeHead(200, {
-      'Content-Type': 'application/rss+xml; charset=utf-8',
-      'Cache-Control': 'no-store',
-    });
-    response.end(`<?xml version="1.0" encoding="UTF-8"?>
-      <rss version="2.0">
-        <channel>
-          <title>${isLongFeed ? 'Long Article Feed' : 'P0 Test Feed'}</title>
-          <description>Local Playwright RSS fixture</description>
-          <link>http://127.0.0.1/</link>
-          <item>
-            <guid>${isLongFeed ? 'long-article-1' : 'p0-article-1'}</guid>
-            <title>${fixtureTitle}</title>
-            <link>${fixtureFeedUrl.replace('/feed.xml', '/article-1')}</link>
-            <description>Searchable Playwright summary</description>
-            <content:encoded xmlns:content="http://purl.org/rss/1.0/modules/content/"><![CDATA[
-              <p>${fixtureContent}</p>
-            ]]></content:encoded>
-            <author>FluxFeed Test</author>
-            <pubDate>Tue, 28 Jul 2026 12:00:00 GMT</pubDate>
-          </item>
-        </channel>
-      </rss>`);
-  });
-  await new Promise<void>((resolve, reject) => {
-    fixtureServer?.once('error', reject);
-    fixtureServer?.listen(0, '127.0.0.1', resolve);
-  });
-  const address = fixtureServer.address() as AddressInfo;
-  fixtureFeedUrl = `http://127.0.0.1:${address.port}/feed.xml`;
-
-  const extensionPath = path.resolve('.output/chrome-mv3');
-  context = await chromium.launchPersistentContext('', {
-    channel: 'chromium',
-    headless: true,
-    args: [
-      `--disable-extensions-except=${extensionPath}`,
-      `--load-extension=${extensionPath}`,
-    ],
-  });
-
-  let [serviceWorker] = context.serviceWorkers();
-  serviceWorker ??= await context.waitForEvent('serviceworker');
-  extensionId = new URL(serviceWorker.url()).host;
+  const article = page.getByRole('button', { name: /Discovered Website Article/ });
+  await expect(article).toBeVisible();
+  await article.click();
+  await expect(page.getByTestId('reading-pane').getByText(
+    'Read after discovering a feed in the extension worker.',
+  )).toBeVisible();
+  await page.reload();
+  await expect(article).toBeVisible();
+  await expect(page.getByText('Website Discovery Feed', { exact: true }).first()).toBeVisible();
 });
 
-test.afterAll(async () => {
-  await context?.close();
-  await new Promise<void>((resolve, reject) => {
-    if (!fixtureServer) {
-      resolve();
-      return;
-    }
-    fixtureServer.close((error) => error ? reject(error) : resolve());
-  });
-});
-
-test('subscribes using a website URL in a DOM-free extension worker', async () => {
-  const extensionPath = path.resolve('.output/chrome-mv3');
-  // Keep discovery independent of the language, subscriptions, and settings from other tests.
-  const discoveryContext = await chromium.launchPersistentContext('', {
-    channel: 'chromium',
-    headless: true,
-    args: [
-      `--disable-extensions-except=${extensionPath}`,
-      `--load-extension=${extensionPath}`,
-    ],
-  });
-
-  try {
-    let [worker] = discoveryContext.serviceWorkers();
-    worker ??= await discoveryContext.waitForEvent('serviceworker');
-    expect(await worker.evaluate(() => typeof DOMParser)).toBe('undefined');
-    const discoveryExtensionId = new URL(worker.url()).host;
-    const page = await discoveryContext.newPage();
-    await page.setViewportSize({ width: 1600, height: 900 });
-    await page.goto(`chrome-extension://${discoveryExtensionId}/options.html#/all`);
-    await page.getByRole('button', { name: 'Add Feed', exact: true }).click();
-    await page.getByLabel('Feed URL').fill(new URL('/discovery/website', fixtureFeedUrl).href);
-    await page.getByRole('button', { name: 'Subscribe', exact: true }).click();
-
-    const article = page.getByRole('button', { name: /Discovered Website Article/ });
-    await expect(article).toBeVisible();
-    await article.click();
-    await expect(page.getByTestId('reading-pane').getByText(
-      'Read after discovering a feed in the extension worker.',
-    )).toBeVisible();
-    await page.reload();
-    await expect(article).toBeVisible();
-    await expect(page.getByText('Website Discovery Feed', { exact: true }).first()).toBeVisible();
-  } finally {
-    await discoveryContext.close();
-  }
-});
-
-test('renders the options reader and settings hash route', async () => {
-  if (!context) throw new Error('Extension browser context was not created');
+test('renders the options reader and settings hash route', async ({ extension }) => {
+  const { context, extensionId } = extension;
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/options.html`);
   await expect(page.getByTestId('reader-layout')).toBeVisible();
@@ -243,15 +45,13 @@ test('renders the options reader and settings hash route', async () => {
   await folderSelect.click();
   const selectContent = page.locator('[data-slot="select-content"]');
   await expect(selectContent).toBeVisible();
-  await page.waitForTimeout(150);
-  const [selectBox, contentBox] = await Promise.all([
-    folderSelectTrigger.boundingBox(),
-    selectContent.boundingBox(),
-  ]);
-  expect(
-    Math.abs((selectBox?.width ?? 0) - (contentBox?.width ?? 0)),
-    JSON.stringify({ triggerWidth: selectBox?.width, contentWidth: contentBox?.width }),
-  ).toBeLessThanOrEqual(1);
+  await expect.poll(async () => {
+    const [selectBox, contentBox] = await Promise.all([
+      folderSelectTrigger.boundingBox(),
+      selectContent.boundingBox(),
+    ]);
+    return Math.abs((selectBox?.width ?? 0) - (contentBox?.width ?? 0));
+  }).toBeLessThanOrEqual(1);
 
   await page.goto(`chrome-extension://${extensionId}/options.html#/settings`);
   await expect(page.getByTestId('settings-container')).toBeVisible();
@@ -263,7 +63,6 @@ test('renders the options reader and settings hash route', async () => {
   await colorThemeGroup.getByLabel('White').click();
   const unreadInbox = page.getByRole('switch', { name: 'Unread Inbox', exact: true });
   await expect(unreadInbox).toBeChecked();
-  // Keep subsequent cross-feed navigation checks inclusive of already-read fixtures.
   await unreadInbox.click();
   await appearanceModeGroup.getByLabel('Light').click();
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
@@ -284,7 +83,7 @@ test('renders the options reader and settings hash route', async () => {
   await expect(colorThemeGroup.getByLabel('White')).toBeChecked();
   expect((await colorThemeGroup.boundingBox())!.height).toBeLessThanOrEqual(90);
   await colorThemeGroup.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/fluxfeed-white-theme.png', animations: 'disabled' });
+  await page.screenshot({ path: extension.outputPath('fluxfeed-white-theme.png'), animations: 'disabled' });
   await page.setViewportSize({ width: 900, height: 700 });
   await colorThemeGroup.scrollIntoViewIfNeeded();
   const themeGroupBox = (await colorThemeGroup.boundingBox())!;
@@ -293,7 +92,7 @@ test('renders the options reader and settings hash route', async () => {
     expect(box.x).toBeGreaterThanOrEqual(themeGroupBox.x);
     expect(box.x + box.width).toBeLessThanOrEqual(themeGroupBox.x + themeGroupBox.width);
   }
-  await page.screenshot({ path: '/tmp/fluxfeed-theme-narrow.png', animations: 'disabled' });
+  await page.screenshot({ path: extension.outputPath('fluxfeed-theme-narrow.png'), animations: 'disabled' });
   await page.setViewportSize({ width: 1280, height: 720 });
   await appearanceModeGroup.getByLabel('Dark').click();
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(21, 21, 21)');
@@ -313,7 +112,7 @@ test('renders the options reader and settings hash route', async () => {
     const addFeedButton = page.getByRole('button', { name: 'Add Feed', exact: true });
     await expect(addFeedButton).toHaveCSS('background-color', palette.primary);
     await colorThemeGroup.scrollIntoViewIfNeeded();
-    await page.screenshot({ path: `/tmp/fluxfeed-theme-${palette.id}.png`, animations: 'disabled' });
+    await page.screenshot({ path: extension.outputPath(`fluxfeed-theme-${palette.id}.png`), animations: 'disabled' });
     await appearanceModeGroup.getByLabel('Dark').click();
     await expect(addFeedButton).toHaveCSS('background-color', palette.darkPrimary);
     await page.reload();
@@ -367,16 +166,16 @@ test('renders the options reader and settings hash route', async () => {
   expect((await readingFontGroup.boundingBox())!.height).toBeLessThanOrEqual(45);
   expect((await interfaceFontGroup.boundingBox())!.height).toBeLessThanOrEqual(45);
   await readingFontGroup.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/fluxfeed-fonts-compact-light.png', animations: 'disabled' });
+  await page.screenshot({ path: extension.outputPath('fluxfeed-fonts-compact-light.png'), animations: 'disabled' });
   await appearanceModeGroup.getByLabel('Dark').click();
   await readingFontGroup.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/fluxfeed-fonts-compact-dark.png', animations: 'disabled' });
+  await page.screenshot({ path: extension.outputPath('fluxfeed-fonts-compact-dark.png'), animations: 'disabled' });
   await appearanceModeGroup.getByLabel('Light').click();
 
 });
 
-test('adapts the reader chrome to laptop and narrow widths', async () => {
-  if (!context) throw new Error('Extension browser context was not created');
+test('adapts the reader chrome to laptop and narrow widths', async ({ extension }) => {
+  const { context, extensionId } = extension;
   const page = await context.newPage();
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(`chrome-extension://${extensionId}/options.html#/inbox`);
@@ -402,8 +201,8 @@ test('adapts the reader chrome to laptop and narrow widths', async () => {
   await expect(page.getByText('Select an article')).toBeHidden();
 });
 
-test('collapses desktop navigation, restores it after reload, and preserves the narrow drawer', async () => {
-  if (!context) throw new Error('Extension browser context was not created');
+test('collapses desktop navigation, restores it after reload, and preserves the narrow drawer', async ({ extension }) => {
+  const { context, extensionId } = extension;
   const page = await context.newPage();
   await page.setViewportSize({ width: 1600, height: 900 });
   await page.goto(`chrome-extension://${extensionId}/options.html#/inbox`);
@@ -415,7 +214,7 @@ test('collapses desktop navigation, restores it after reload, and preserves the 
   await expect.poll(async () => Math.round((await panel.boundingBox())?.x ?? -1)).toBe(0);
   await page.reload();
   await expect(sidebar).toBeHidden();
-  await page.screenshot({ path: 'test-results/sidebar-collapsed.png' });
+  await page.screenshot({ path: extension.outputPath('sidebar-collapsed.png') });
   await page.setViewportSize({ width: 1000, height: 800 });
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await expect.poll(async () => Math.round((await sidebar.boundingBox())?.x ?? -1)).toBe(0);
@@ -424,7 +223,7 @@ test('collapses desktop navigation, restores it after reload, and preserves the 
   await page.getByRole('button', { name: 'Expand sidebar' }).click();
   await expect(sidebar).toBeVisible();
   await expect.poll(async () => Math.round((await panel.boundingBox())?.x ?? -1)).toBe(72);
-  await page.screenshot({ path: 'test-results/sidebar-expanded.png' });
+  await page.screenshot({ path: extension.outputPath('sidebar-expanded.png') });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.getByRole('button', { name: 'Collapse sidebar' }).click();
   await expect(sidebar).toBeHidden();
@@ -433,8 +232,8 @@ test('collapses desktop navigation, restores it after reload, and preserves the 
   await page.close();
 });
 
-test('configures AI summaries and opens the daily briefing route', async () => {
-  if (!context) throw new Error('Extension browser context was not created');
+test('configures AI summaries and opens the daily briefing route', async ({ extension }) => {
+  const { context, extensionId } = extension;
   const page = await context.newPage();
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(`chrome-extension://${extensionId}/options.html#/settings?section=ai`);
@@ -463,8 +262,10 @@ test('configures AI summaries and opens the daily briefing route', async () => {
   await expect(page.getByText('No articles arrived today.')).toBeVisible();
 });
 
-test('completes the subscription, reading, persistence, search, and deletion workflow', async () => {
-  if (!context) throw new Error('Extension browser context was not created');
+test('completes the subscription, reading, persistence, search, and deletion workflow', async ({ extension, fixtureServer }) => {
+  const { context, extensionId } = extension;
+  const fixtureFeedUrl = fixtureServer.feedUrl;
+  await extension.configureSettings({ showUnreadOnly: false });
   const page = await context.newPage();
   await page.setViewportSize({ width: 1600, height: 900 });
   await page.goto(`chrome-extension://${extensionId}/options.html#/inbox`);
@@ -511,10 +312,10 @@ test('completes the subscription, reading, persistence, search, and deletion wor
 });
 
 
-test('summarizes a confirmed article prefix and retains the cache after AI failure', async () => {
-  if (!context) {
-    throw new Error('Extension browser context was not created');
-  }
+test('summarizes a confirmed article prefix and retains the cache after AI failure', async ({ extension, fixtureServer }) => {
+  const { context, extensionId } = extension;
+  const fixtureFeedUrl = fixtureServer.feedUrl;
+  await extension.configureSettings({ showUnreadOnly: false });
   const page = await context.newPage();
   await page.setViewportSize({ width: 1280, height: 800 });
   const origin = new URL(fixtureFeedUrl).origin;
@@ -532,30 +333,30 @@ test('summarizes a confirmed article prefix and retains the cache after AI failu
   await page.getByRole('button', { name: 'Subscribe' }).click();
   await page.getByRole('button', { name: /Long Summary Article/ }).click();
 
-  aiRequests = 0;
+  fixtureServer.ai.requests = 0;
   await page.getByRole('button', { name: 'Generate summary' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  expect(aiRequests).toBe(0);
+  expect(fixtureServer.ai.requests).toBe(0);
   await page.getByRole('button', { name: 'Summarize opening portion' }).click();
   await expect(page.getByText('Local AI summary 6', { exact: true })).toBeVisible();
-  expect(aiRequests).toBe(6);
+  expect(fixtureServer.ai.requests).toBe(6);
   await expect(page.getByText('Partial summary: only the opening portion of the article was processed.')).toBeVisible();
 
   await page.reload();
   await page.getByRole('button', { name: /Long Summary Article/ }).click();
   await expect(page.getByText('Local AI summary 6', { exact: true })).toBeVisible();
-  expect(aiRequests).toBe(6);
+  expect(fixtureServer.ai.requests).toBe(6);
 
-  rejectAiRequests = true;
+  fixtureServer.ai.rejectRequests = true;
   try {
     await page.getByRole('button', { name: 'Regenerate' }).click();
     await page.getByRole('button', { name: 'Summarize opening portion' }).click();
     await expect(page.getByRole('alert')).toBeVisible();
     await expect(page.getByText('Local AI summary 6', { exact: true })).toBeVisible();
-    expect(aiRequests).toBe(8);
-    await page.screenshot({ path: '/tmp/fluxfeed-long-article-summary.png' });
+    expect(fixtureServer.ai.requests).toBe(8);
+    await page.screenshot({ path: extension.outputPath('fluxfeed-long-article-summary.png') });
   } finally {
-    rejectAiRequests = false;
+    fixtureServer.ai.rejectRequests = false;
     await page.close();
   }
 });
@@ -565,10 +366,11 @@ for (const fixture of [
   { provider: 'google', label: 'Gemini', model: 'gemini-2.5-flash' },
   { provider: 'anthropic', label: 'Claude', model: 'claude-sonnet-4-5' },
 ]) {
-  test(`configures ${fixture.label} and generates a native long-article summary`, async () => {
-    if (!context) {
-      throw new Error('Extension browser context was not created');
-    }
+  test(`configures ${fixture.label} and generates a native long-article summary`, async ({ extension, fixtureServer }) => {
+    const { context, extensionId } = extension;
+    const fixtureFeedUrl = fixtureServer.feedUrl;
+    await extension.configureSettings({ showUnreadOnly: false });
+    await extension.addFeed('/long-feed.xml');
     const page = await context.newPage();
     await page.setViewportSize({ width: 760, height: 900 });
     await page.goto(`chrome-extension://${extensionId}/options.html#/settings?section=ai`);
@@ -587,40 +389,41 @@ for (const fixture of [
     await expect(page.getByRole('radio', { name: fixture.label, exact: true })).toBeChecked();
     await expect(page.getByLabel('Model', { exact: true })).toHaveValue(fixture.model);
     await expect(page.getByText('A key is saved', { exact: true })).toBeVisible();
-    await page.screenshot({ path: `/tmp/fluxfeed-${fixture.provider}-settings.png` });
+    await page.screenshot({ path: extension.outputPath(`fluxfeed-${fixture.provider}-settings.png`) });
 
-    nativeRequests = [];
+    fixtureServer.ai.nativeRequests = [];
     await page.getByRole('button', { name: 'Test connection', exact: true }).click();
     await expect(page.getByText('Connection successful', { exact: true })).toBeVisible();
-    expect(nativeRequests).toHaveLength(1);
-    expect(nativeRequests[0].key).toBe(key);
+    expect(fixtureServer.ai.nativeRequests).toHaveLength(1);
+    expect(fixtureServer.ai.nativeRequests[0].key).toBe(key);
 
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
     await page.getByRole('button', { name: /Long Summary Article/ }).click();
-    nativeRequests = [];
-    await page.getByRole('button', { name: 'Regenerate', exact: true }).click();
+    fixtureServer.ai.nativeRequests = [];
+    await page.getByRole('button', { name: 'Generate summary', exact: true }).click();
     await page.getByRole('button', { name: 'Summarize opening portion', exact: true }).click();
     const overview = `Native ${fixture.provider} summary 6`;
     await expect(page.getByText(overview, { exact: true })).toBeVisible();
-    expect(nativeRequests).toHaveLength(6);
-    expect(nativeRequests.every((item) => item.provider === fixture.provider && item.key === key)).toBe(true);
-    expect(nativeRequests[0].body).toContain('Long article evidence.');
+    expect(fixtureServer.ai.nativeRequests).toHaveLength(6);
+    expect(fixtureServer.ai.nativeRequests.every((item) => item.provider === fixture.provider && item.key === key)).toBe(true);
+    expect(fixtureServer.ai.nativeRequests[0].body).toContain('Long article evidence.');
     await page.reload();
     await page.getByRole('button', { name: /Long Summary Article/ }).click();
     await expect(page.getByText(overview, { exact: true })).toBeVisible();
-    expect(nativeRequests).toHaveLength(6);
+    expect(fixtureServer.ai.nativeRequests).toHaveLength(6);
     await page.close();
   });
 }
 
-test('creates folders and feeds from the plus menu while keeping the footer feed-only', async () => {
-  if (!context) {
-    throw new Error('Extension browser context was not created');
-  }
+test('creates folders and feeds from the plus menu while keeping the footer feed-only', async ({ extension, fixtureServer }) => {
+  const { context, extensionId } = extension;
+  const fixtureFeedUrl = fixtureServer.feedUrl;
+  await extension.configureSettings({ showUnreadOnly: false });
+  await extension.addFeed('/long-feed.xml');
   const page = await context.newPage();
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
+  await page.goto(`chrome-extension://${extensionId}/options.html#/settings`);
   await expect(page.getByRole('button', { name: 'Add Feed', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Add feed or folder', exact: true }).click();
   await expect(page.getByRole('menuitem', { name: 'Add Feed', exact: true })).toBeVisible();
@@ -637,7 +440,7 @@ test('creates folders and feeds from the plus menu while keeping the footer feed
   await page.getByLabel('Feed URL').fill(fixtureFeedUrl);
   await page.getByRole('button', { name: 'Subscribe', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
-  await expect(page.getByRole('button', { name: /Integration Test Article/ })).toBeVisible();
+  await expect(page.getByTestId(/^tree-node-feed:/).filter({ hasText: 'P0 Test Feed' })).toBeVisible();
 
   await folder.hover();
   await page.getByRole('button', { name: 'Add in Reading', exact: true }).click();
@@ -651,6 +454,10 @@ test('creates folders and feeds from the plus menu while keeping the footer feed
   await page.getByRole('menuitem', { name: 'Add Feed', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Folder', exact: true })).toContainText('Reading / Engineering');
   await page.keyboard.press('Escape');
+
+  // Manage folders before mounting the reader; its initial queries are a separate workflow.
+  await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
+  await expect(page.getByRole('button', { name: /Integration Test Article/ })).toBeVisible();
 
   // Switching a feed back to Inbox must restore the entire library's article list.
   await page.getByTestId(/^tree-node-feed:/).filter({ hasText: 'P0 Test Feed' }).click();
@@ -671,7 +478,7 @@ test('creates folders and feeds from the plus menu while keeping the footer feed
   await page.getByRole('button', { name: '添加订阅', exact: true }).click();
   await expect(page.getByRole('dialog').getByRole('radiogroup')).toHaveCount(0);
   await expect(page.getByRole('dialog')).toBeVisible();
-  await page.screenshot({ path: '/tmp/fluxfeed-add-feed-compact.png', animations: 'disabled' });
+  await page.screenshot({ path: extension.outputPath('fluxfeed-add-feed-compact.png'), animations: 'disabled' });
   await page.getByLabel('订阅地址').fill('https://example.com/unsaved');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: '添加订阅', exact: true })).toBeFocused();
@@ -681,10 +488,10 @@ test('creates folders and feeds from the plus menu while keeping the footer feed
 
   await page.getByRole('button', { name: '添加订阅或目录', exact: true }).click();
   await expect(page.getByRole('menu')).toBeVisible();
-  await page.screenshot({ path: '/tmp/fluxfeed-folder-add-menu.png', animations: 'disabled' });
+  await page.screenshot({ path: extension.outputPath('fluxfeed-folder-add-menu.png'), animations: 'disabled' });
   await page.getByRole('menuitem', { name: '创建目录', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  await page.screenshot({ path: '/tmp/fluxfeed-create-folder-compact.png', animations: 'disabled' });
+  await page.screenshot({ path: extension.outputPath('fluxfeed-create-folder-compact.png'), animations: 'disabled' });
   await page.keyboard.press('Escape');
   await page.setViewportSize({ width: 390, height: 700 });
   await page.getByRole('button', { name: '打开导航', exact: true }).click();
@@ -694,15 +501,24 @@ test('creates folders and feeds from the plus menu while keeping the footer feed
   await expect(dialog.getByRole('button', { name: '订阅', exact: true })).toBeVisible();
   await page.getByLabel('订阅地址').click();
   await expect(page.getByLabel('订阅地址')).toBeFocused();
-  await page.screenshot({ path: '/tmp/fluxfeed-add-feed-mobile.png', animations: 'disabled' });
+  await page.screenshot({ path: extension.outputPath('fluxfeed-add-feed-mobile.png'), animations: 'disabled' });
   await page.close();
 });
 
 
-test('keeps the reader compact and persists summary visibility without deleting cached results', async () => {
-  if (!context) {
-    throw new Error('Extension browser context was not created');
-  }
+test('keeps the reader compact and persists summary visibility without deleting cached results', async ({ extension, fixtureServer }) => {
+  const { context, extensionId } = extension;
+  const fixtureFeedUrl = fixtureServer.feedUrl;
+  await extension.configureSettings({
+    language: 'zh-CN',
+    theme: 'light',
+    showUnreadOnly: false,
+    ai: {
+      ...DEFAULT_SETTINGS.ai,
+      apiUrl: `${fixtureServer.origin}/ai/chat/completions`,
+      model: 'local-reader-model',
+    },
+  });
   const page = await context.newPage();
   await page.setViewportSize({ width: 1440, height: 900 });
   const settingsUrl = `chrome-extension://${extensionId}/options.html#/settings?section=ai`;
@@ -724,9 +540,9 @@ test('keeps the reader compact and persists summary visibility without deleting 
   expect(await pane.getByRole('heading', { name: title }).evaluate((element) => parseFloat(getComputedStyle(element).fontSize))).toBeLessThanOrEqual(32);
   expect((await summary.boundingBox())!.height).toBeLessThanOrEqual(60);
   expect((await pane.locator('.reader-prose').boundingBox())!.y).toBeLessThan(400);
-  await page.screenshot({ path: '/tmp/fluxfeed-reader-compact.png', animations: 'disabled' });
+  await page.screenshot({ path: extension.outputPath('fluxfeed-reader-compact.png'), animations: 'disabled' });
   await page.getByRole('button', { name: '生成摘要', exact: true }).click();
-  await expect(summary.getByText(/Native anthropic summary/)).toBeVisible();
+  await expect(summary.getByText(/Local AI summary/)).toBeVisible();
   const savedOverview = await summary.locator('p.font-reading').innerText();
 
   await page.goto(settingsUrl);
@@ -738,7 +554,7 @@ test('keeps the reader compact and persists summary visibility without deleting 
   await page.getByRole('button', { name: title, exact: false }).click();
   await expect(summary).toHaveCount(0);
   expect((await pane.locator('.reader-prose').boundingBox())!.y).toBeLessThan(330);
-  await page.screenshot({ path: '/tmp/fluxfeed-reader-summary-hidden.png', animations: 'disabled' });
+  await page.screenshot({ path: extension.outputPath('fluxfeed-reader-summary-hidden.png'), animations: 'disabled' });
 
   await page.goto(settingsUrl);
   await page.getByRole('switch', { name: '显示文章 AI 摘要', exact: true }).click();
@@ -748,14 +564,20 @@ test('keeps the reader compact and persists summary visibility without deleting 
   await page.setViewportSize({ width: 390, height: 700 });
   await expect.poll(() => pane.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   expect(await pane.getByRole('heading', { name: title }).evaluate((element) => parseFloat(getComputedStyle(element).fontSize))).toBeLessThanOrEqual(28);
-  await page.screenshot({ path: '/tmp/fluxfeed-reader-mobile.png', animations: 'disabled' });
+  await page.screenshot({ path: extension.outputPath('fluxfeed-reader-mobile.png'), animations: 'disabled' });
   await page.close();
 });
 
-test('imports from compact data controls and opens originals in a foreground tab', async () => {
-  if (!context) {
-    throw new Error('Extension browser context was not created');
-  }
+test('imports from compact data controls and opens originals in a foreground tab', async ({ extension, fixtureServer }) => {
+  const { context, extensionId } = extension;
+  const fixtureFeedUrl = fixtureServer.feedUrl;
+  await extension.configureSettings({
+    language: 'zh-CN',
+    theme: 'light',
+    showUnreadOnly: false,
+  });
+  await extension.addFeed();
+  await extension.addFeed('/reader-feed.xml');
   const page = await context.newPage();
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`chrome-extension://${extensionId}/options.html#/settings?section=data`);
@@ -778,7 +600,7 @@ test('imports from compact data controls and opens originals in a foreground tab
   await exportButton.click();
   expect((await downloadPromise).suggestedFilename()).toMatch(/^fluxfeed-.*\.opml$/);
   await dataSection.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/tmp/fluxfeed-data-shortcuts-compact.png', animations: 'disabled' });
+  await page.screenshot({ path: extension.outputPath('fluxfeed-data-shortcuts-compact.png'), animations: 'disabled' });
 
   await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
   const cards = page.locator('[data-reader-article-id]');
@@ -806,10 +628,10 @@ test('imports from compact data controls and opens originals in a foreground tab
 });
 
 
-test('switches all five article styles independently and persists them across settings and reader', async () => {
-  if (!context) {
-    throw new Error('Extension browser context was not created');
-  }
+test('switches all five article styles independently and persists them across settings and reader', async ({ extension, fixtureServer }) => {
+  const { context, extensionId } = extension;
+  const fixtureFeedUrl = fixtureServer.feedUrl;
+  await extension.configureSettings({ language: 'zh-CN', theme: 'light' });
   const page = await context.newPage();
   await page.setViewportSize({ width: 1600, height: 1100 });
   await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
@@ -861,7 +683,7 @@ test('switches all five article styles independently and persists them across se
       const quote = getComputedStyle(element.querySelector('blockquote')!);
       return [code.backgroundColor, heading.textAlign, heading.borderBottomStyle, quote.backgroundColor].join('|');
     }));
-    await page.screenshot({ path: `/tmp/fluxfeed-article-${style.id}-light.png`, animations: 'disabled' });
+    await page.screenshot({ path: extension.outputPath(`fluxfeed-article-${style.id}-light.png`), animations: 'disabled' });
   }
   expect(signatures.size).toBe(5);
   await page.reload();
@@ -877,7 +699,7 @@ test('switches all five article styles independently and persists them across se
     await chooseStyle(style.name);
     await expect(prose.locator('a')).toHaveCSS('color', darkLinkColors[index]);
     await expect(prose.locator('pre .hljs-keyword').first()).toHaveCSS('color', 'rgb(216, 161, 233)');
-    await page.screenshot({ path: `/tmp/fluxfeed-article-${style.id}-dark.png`, animations: 'disabled' });
+    await page.screenshot({ path: extension.outputPath(`fluxfeed-article-${style.id}-dark.png`), animations: 'disabled' });
   }
   await chooseStyle('Vue 风格');
   await page.setViewportSize({ width: 390, height: 800 });
@@ -886,6 +708,6 @@ test('switches all five article styles independently and persists them across se
   for (const element of [prose.locator('pre'), prose.locator('table')]) {
     await expect.poll(() => element.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
   }
-  await page.screenshot({ path: '/tmp/fluxfeed-article-vue-mobile.png', animations: 'disabled' });
+  await page.screenshot({ path: extension.outputPath('fluxfeed-article-vue-mobile.png'), animations: 'disabled' });
   await page.close();
 });

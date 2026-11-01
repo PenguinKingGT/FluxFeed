@@ -15,6 +15,10 @@ stats-*.json
 .superpowers/
 web-ext.config.ts
 
+# Browser test artifacts
+/test-results/
+/playwright-report/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

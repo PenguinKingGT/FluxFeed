@@ -49,6 +49,7 @@
 - 单元测试覆盖永久保留、数量上限、全文搜索、并发刷新、多 Feed 选择和 OPML 层级。
 - Playwright 启动真实 Chromium 扩展，验证 Options 根页面和 Settings Hash 路由均能渲染。
 - Playwright 使用本地 RSS 夹具验证添加订阅、文章入库、阅读操作、搜索、持久化和删除订阅的完整闭环。
+- E2E 为每个用例和重试创建独立浏览器资料与本地 HTTP 服务；语言、AI 配置及订阅前置数据由当前用例显式准备，不依赖执行顺序。截图按用例和重试分目录保存，详见 [E2E 运行与隔离说明](../../tests/e2e/README.md)。
 - Runtime 消息拒绝统一转换为失败响应，Store 不得因为 Service Worker 重载而永久停留在加载状态。
 
 ## 不在本轮范围
