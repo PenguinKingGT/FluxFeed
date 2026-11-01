@@ -1,5 +1,9 @@
 export const en = {
   'app.subtitle': 'RSS Reader',
+  'feed.fetchTimeout': 'The feed request timed out. Please try again.',
+  'feed.responseTooLarge': 'This feed is too large to read.',
+  'feed.discoveryLoop': 'This website links back to itself. Try the direct feed address.',
+  'feed.discoveryLimit': 'Too many steps to find a feed. Try the direct feed address.',
   'navigation.collapseSidebar': 'Collapse sidebar',
   'navigation.expandSidebar': 'Expand sidebar',
   'navigation.inbox': 'Inbox',

@@ -80,4 +80,23 @@ describe('FeedDetectionBanner', () => {
 
     await waitFor(() => expect(onSubscribe).toHaveBeenCalledWith('https://example.com/main.xml'));
   });
+
+  it('localizes fetch failures and keeps the subscribe action retryable', async () => {
+    const onSubscribe = vi.fn()
+      .mockResolvedValueOnce({ success: false, error: 'FEED_RESPONSE_TOO_LARGE' })
+      .mockResolvedValueOnce({ success: true });
+    render(
+      <FeedDetectionBanner
+        feeds={[{ url: 'https://example.com/feed.xml', title: 'RSS' }]}
+        subscribedUrls={new Set()}
+        onSubscribe={onSubscribe}
+      />,
+    );
+    fireEvent.click(screen.getByText('Subscribe to this page'));
+    await waitFor(() => expect(screen.getByText('This feed is too large to read.')).not.toBeNull());
+    fireEvent.click(screen.getByText('Subscribe to this page'));
+    await waitFor(() => expect(screen.getByText('Subscribed ✓')).not.toBeNull());
+    expect(onSubscribe).toHaveBeenCalledTimes(2);
+  });
+
 });

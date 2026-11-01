@@ -2,6 +2,10 @@ import type { en } from './en';
 
 export const zhCN: Record<keyof typeof en, string> = {
   'app.subtitle': 'RSS阅读器',
+  'feed.fetchTimeout': '订阅请求超时，请重试。',
+  'feed.responseTooLarge': '订阅内容过大，暂时无法读取。',
+  'feed.discoveryLoop': '网站的订阅链接存在循环，请尝试直接输入订阅地址。',
+  'feed.discoveryLimit': '查找订阅的步骤过多，请尝试直接输入订阅地址。',
   'navigation.collapseSidebar': '收起侧栏',
   'navigation.expandSidebar': '展开侧栏',
   'navigation.inbox': '收件箱',

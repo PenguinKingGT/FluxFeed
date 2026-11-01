@@ -8,6 +8,11 @@ test('subscribes using a website URL in a DOM-free extension worker', async ({ e
   await page.setViewportSize({ width: 1600, height: 900 });
   await page.goto(`chrome-extension://${extensionId}/options.html#/all`);
   await page.getByRole('button', { name: 'Add Feed', exact: true }).click();
+  await page.getByLabel('Feed URL').fill(`${fixtureServer.origin}/discovery/loop`);
+  await page.getByRole('button', { name: 'Subscribe', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveText(
+    'This website links back to itself. Try the direct feed address.',
+  );
   await page.getByLabel('Feed URL').fill(`${fixtureServer.origin}/discovery/website`);
   await page.getByRole('button', { name: 'Subscribe', exact: true }).click();
 

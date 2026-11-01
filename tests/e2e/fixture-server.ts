@@ -87,6 +87,11 @@ export async function startFixtureServer(): Promise<FixtureServer> {
       response.end('<!doctype html><title>Original article</title><p>Original article content.</p>');
       return;
     }
+    if (request.url === '/discovery/loop') {
+      response.writeHead(200, { 'Content-Type': 'text/html' });
+      response.end('<link rel="alternate" type="application/rss+xml" href="/discovery/loop#feed">');
+      return;
+    }
     if (request.url === '/discovery/website') {
       response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       response.end(`<!doctype html><html><head>

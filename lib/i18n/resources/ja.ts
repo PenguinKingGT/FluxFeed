@@ -2,6 +2,10 @@ import type { en } from './en';
 
 export const ja: Record<keyof typeof en, string> = {
   'app.subtitle': 'RSSリーダー',
+  'feed.fetchTimeout': 'フィードの取得がタイムアウトしました。もう一度お試しください。',
+  'feed.responseTooLarge': 'このフィードは大きすぎるため読み込めません。',
+  'feed.discoveryLoop': 'フィードのリンクが循環しています。フィードの直接 URL をお試しください。',
+  'feed.discoveryLimit': 'フィードの検索手順が多すぎます。フィードの直接 URL をお試しください。',
   'navigation.collapseSidebar': 'サイドバーを折りたたむ',
   'navigation.expandSidebar': 'サイドバーを展開',
   'navigation.inbox': '受信トレイ',

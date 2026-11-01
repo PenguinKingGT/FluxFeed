@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { getFeedErrorTranslationKey } from '@/lib/feed/feed-errors';
 import { Folder, FolderPlus, Loader2, Rss } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -113,7 +114,9 @@ export function AddContentDialog({
         ? await addFeed(trimmed, groupId)
         : await createGroup(trimmed, groupId);
       if (!response.success) {
-        setError(response.error ?? t(isFeed ? 'feed.addFailed' : 'folder.createFailed'));
+        const errorKey = isFeed ? getFeedErrorTranslationKey(response.error) : undefined;
+        const fallback = response.error ?? t(isFeed ? 'feed.addFailed' : 'folder.createFailed');
+        setError(errorKey ? t(errorKey) : fallback);
         return;
       }
       if (isFeed) {

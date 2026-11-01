@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getFeedErrorTranslationKey } from '@/lib/feed/feed-errors';
 import { Check, Loader2, Rss } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ export function FeedDetectionBanner({ feeds, subscribedUrls, onSubscribe }: Feed
     return null;
   }
 
+  /** Shows stable fetch failures in the current UI language and leaves subscription retryable. */
   async function handleSubscribe() {
     setStatus('loading');
     setError(null);
@@ -37,7 +39,8 @@ export function FeedDetectionBanner({ feeds, subscribedUrls, onSubscribe }: Feed
       return;
     }
     setStatus('error');
-    setError(response.error ?? t('popup.subscribeFailed'));
+    const errorKey = getFeedErrorTranslationKey(response.error);
+    setError(errorKey ? t(errorKey) : response.error ?? t('popup.subscribeFailed'));
   }
 
   const subscribed = subscribedUrls.has(selectedFeed.url) || status === 'success';

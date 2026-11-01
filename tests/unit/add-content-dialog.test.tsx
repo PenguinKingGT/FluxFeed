@@ -115,4 +115,19 @@ describe('unified content creation', () => {
     expect((screen.getByRole('button', { name: 'Create folder' }) as HTMLButtonElement).disabled).toBe(false);
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it('localizes a timeout and allows retrying the same subscription', async () => {
+    addFeed.mockResolvedValueOnce({ success: false, error: 'FEED_TIMEOUT' });
+    renderDialog();
+    fireEvent.change(screen.getByLabelText('Feed URL'), { target: { value: 'https://example.com/feed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(
+      'The feed request timed out. Please try again.',
+    ));
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(addFeed).toHaveBeenCalledTimes(2);
+  });
+
 });

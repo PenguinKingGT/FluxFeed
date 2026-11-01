@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { fetchFeed as boundedFetchFeed } from '@/lib/feed/feed-fetcher';
 import type { Feed } from '@/lib/types';
 import {
   REFRESH_CONCURRENCY,
@@ -158,4 +159,37 @@ describe('background refresh feeds', () => {
 
     expect(maximumActiveRequests).toBe(REFRESH_CONCURRENCY);
   });
+
+  it('finishes a batch after stalled feeds time out and continues queued feeds', async () => {
+    vi.useFakeTimers();
+    try {
+      const feeds = Array.from({ length: REFRESH_CONCURRENCY + 1 }, (_, index) =>
+        createFeed({ id: `feed-${index}`, url: `https://example.com/${index}` }),
+      );
+      const storageService = {
+        getFeeds: vi.fn().mockResolvedValue(feeds),
+        commitFeedRefresh: vi.fn().mockResolvedValue(1),
+        updateFeed: vi.fn().mockResolvedValue(undefined),
+      };
+      const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).endsWith(`/${REFRESH_CONCURRENCY}`)) {
+          return new Response('<rss><channel><title>Healthy</title></channel></rss>');
+        }
+        return new Promise<Response>(() => {});
+      });
+      const pending = refreshAllFeeds({
+        storageService,
+        fetchFeed: (url) => boundedFetchFeed(url, fetcher),
+      });
+      await vi.advanceTimersByTimeAsync(30001);
+      expect(await pending).toBe(1);
+      expect(fetcher).toHaveBeenCalledTimes(feeds.length);
+      expect(storageService.updateFeed).toHaveBeenCalledTimes(REFRESH_CONCURRENCY);
+      expect(storageService.commitFeedRefresh).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
 });

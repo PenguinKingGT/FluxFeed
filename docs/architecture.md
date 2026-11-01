@@ -19,7 +19,9 @@
 
 `fetchFeed` 收到 HTML 时，使用 `discoverFeedLinks` 提取候选 Feed，并继续请求第一个有效候选。发现逻辑使用随扩展打包的 `htmlparser2` 标签事件，不依赖 DOMParser、window 或 document，不构建浏览器 DOM、不执行页面脚本或加载 HTML 中的资源，因此可直接在 Chrome MV3 Service Worker 和 Firefox 后台运行，无需离屏页面或新增权限。
 
-候选按文档顺序保留 RSS、Atom、JSON Feed 的 HTTP(S) 链接；解析属性实体和相对地址，跳过无效地址及非 HTTP(S) 协议，忽略注释、脚本、样式和 template 内的伪链接。单个无效候选不阻止后续发现。内容脚本对当前已打开网页的检测继续使用现有页面 DOM。发现流程的总超时、响应体积和环路限制由 R06 单独处理。
+候选按文档顺序保留 RSS、Atom、JSON Feed 的 HTTP(S) 链接；解析属性实体和相对地址，跳过无效地址及非 HTTP(S) 协议，忽略注释、脚本、样式和 template 内的伪链接。单个无效候选不阻止后续发现。内容脚本对当前已打开网页的检测继续使用现有页面 DOM。抓取及整条 HTML 发现链共用 30 秒期限和 AbortSignal；请求挂起或正文不结束时均稳定返回失败。每次响应最多读取 20 MiB 解压后的字节，同时检查 Content-Length 和实际流量，超限立即停止读取。最多跟随 5 次发现链接（含初始页面最多 6 次 fetch），去除片段后的请求 URL 和重定向最终 URL 都纳入环路检查；相对链接以最终响应 URL 为基准。HTTP 重定向继续使用浏览器 fetch 的内置策略及重定向上限。
+
+所有退出路径释放未消费的响应体，不等待底层取消 Promise；外层期限也约束不响应 AbortSignal 的适配器，晚返回的响应只清理、不继续发现或入库。错误通过稳定代码跨 Runtime 边界，在 Options/Popup 中映射为中英日提示，保留手动重试入口，不自动重试。同步解析受响应体积约束，JavaScript 期限检查无法抢占已经执行中的同步解析。
 
 ## 文章查询与刷新查重
 
